@@ -1,0 +1,83 @@
+using ArtGander.Core.Model;
+using ArtGander.Core.Services;
+using ArtGander.Core.Storage;
+
+namespace ArtGander.Core.Tests;
+
+public class OrderTests
+{
+    [Fact]
+    public void Order_details_drive_the_money_calculation()
+    {
+        using var lib = new TempLibrary();
+        var service = new PieceService(new ArtPieceStore());
+        var a = service.CreatePiece(lib.Root, "A");
+        var product = new Product { Name = "Mug", ProductionCost = 6 };
+        a.Piece.Products.Add(product);
+        a.Piece.Sales.Add(new Sale { OrderRef = "#2001", ProductId = product.Id, Quantity = 1, UnitPrice = 22, Fees = 1 });
+
+        var details = new Order
+        {
+            OrderRef = "#2001",
+            AmountPaid = 30, AmountPaidTax = 5,      // customer paid 30 incl. 5 tax (and shipping)
+            ProductionCost = 8, ProductionTax = 1.6m, // actual Printify bill
+            ShippingCost = 4, ShippingTax = 0.8m,
+            Carrier = "USPS", TrackingCode = "9400 1",
+        };
+
+        var order = SalesReport.Orders(SalesReport.Rows([a]), [details]).Single();
+
+        Assert.Equal(25, order.Revenue);
+        Assert.Equal(9.6m, order.ProductionCost);
+        Assert.Equal(4.8m, order.Shipping);
+        Assert.Equal(9.6m, order.Profit); // 25 - 9.6 - 4.8 - 1
+        Assert.Equal("USPS 9400 1", order.TrackingText);
+    }
+
+    [Fact]
+    public void Without_details_falls_back_to_product_costs()
+    {
+        using var lib = new TempLibrary();
+        var a = new PieceService(new ArtPieceStore()).CreatePiece(lib.Root, "A");
+        var product = new Product { ProductionCost = 6 };
+        a.Piece.Products.Add(product);
+        a.Piece.Sales.Add(new Sale { OrderRef = "#1", ProductId = product.Id, Quantity = 2, UnitPrice = 20 });
+
+        var order = SalesReport.Orders(SalesReport.Rows([a])).Single();
+        Assert.Equal(40, order.Revenue);
+        Assert.Equal(12, order.ProductionCost);
+        Assert.Equal(28, order.Profit);
+    }
+
+    [Fact]
+    public void Orders_without_items_still_show()
+    {
+        var orders = SalesReport.Orders([], [new Order { OrderRef = "#9", AmountPaid = 10 }]);
+        Assert.Equal(10, Assert.Single(orders).Revenue);
+    }
+
+    [Fact]
+    public void Order_files_live_inside_the_art_folder_and_follow_renames()
+    {
+        using var lib = new TempLibrary();
+        var order = new Order { OrderRef = "#1001", Carrier = "PostNL", TrackingCode = "3S123" };
+        OrderStore.Save(lib.Root, order);
+        Assert.True(File.Exists(Path.Combine(lib.Root, ".artgander", "orders", "1001.json")));
+
+        var previous = OrderStore.FileNameFor(order);
+        order.OrderRef = "#1002";
+        OrderStore.Save(lib.Root, order, previous);
+
+        var loaded = Assert.Single(OrderStore.LoadAll(lib.Root));
+        Assert.Equal("#1002", loaded.OrderRef);
+        Assert.Equal("PostNL", loaded.Carrier);
+        Assert.Throws<IOException>(() => OrderStore.Save(lib.Root, new Order { OrderRef = "#1002" }));
+    }
+
+    [Fact]
+    public void Tracking_urls_for_known_carriers()
+    {
+        Assert.Equal("https://tools.usps.com/go/TrackConfirmAction?tLabels=9400%201", Carriers.TrackingUrl("usps", "9400 1"));
+        Assert.Null(Carriers.TrackingUrl("Pigeon", "1"));
+    }
+}

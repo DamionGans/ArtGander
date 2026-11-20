@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ArtGander: a goose wearing a painter's beret. -->
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+  <!-- neck and body -->
+  <path d="M196 140 C150 150 150 210 176 250 C196 282 190 300 150 318 C120 332 112 364 140 380 L322 380 C350 380 360 352 340 330 C318 306 262 300 246 262 C232 228 262 196 252 164 C244 140 222 134 196 140 Z" fill="#FFFFFF"/>
+  <!-- beak -->
+  <path d="M248 160 L304 176 C312 179 312 187 304 190 L250 196 Z" fill="#F29A2E"/>
+  <!-- eye -->
+  <circle cx="222" cy="168" r="9" fill="#1E2A26"/>
+  <!-- beret -->
+  <path d="M168 138 C170 104 236 96 262 124 C268 132 262 140 252 140 L176 146 C170 146 167 143 168 138 Z" fill="#D8433B"/>
+  <circle cx="214" cy="104" r="7" fill="#D8433B"/>
+  <!-- brush stroke -->
+  <path d="M120 400 C200 388 280 412 352 398" stroke="#F29A2E" stroke-width="10" stroke-linecap="round" fill="none"/>
+</svg>

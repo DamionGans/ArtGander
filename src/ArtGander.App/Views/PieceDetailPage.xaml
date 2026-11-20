@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             xmlns:views="clr-namespace:ArtGander.App.Views"
+             xmlns:m="clr-namespace:ArtGander.Core.Model;assembly=ArtGander.Core"
+             x:Class="ArtGander.App.Views.PieceDetailPage"
+             x:Name="Root"
+             x:DataType="vm:PieceDetailViewModel"
+             Title="{Binding EditTitle}">
+
+    <ContentPage.MenuBarItems>
+        <MenuBarItem Text="File">
+            <MenuFlyoutItem Text="Save" Command="{Binding SaveCommand}">
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="{OnPlatform WinUI=Ctrl, MacCatalyst=Cmd}" Key="S" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem Text="Reload from Disk" Command="{Binding ReloadCommand}">
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="{OnPlatform WinUI=Ctrl, MacCatalyst=Cmd}" Key="R" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem Text="Add Files…" Command="{Binding AddFilesCommand}" />
+            <MenuFlyoutItem Text="Show Folder" Command="{Binding RevealFolderCommand}" />
+        </MenuBarItem>
+    </ContentPage.MenuBarItems>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="24,16,24,0" RowSpacing="10">
+        <Grid.GestureRecognizers>
+            <DropGestureRecognizer AllowDrop="True" Drop="OnDrop" />
+        </Grid.GestureRecognizers>
+
+        <!-- Header -->
+        <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="16">
+            <Border Style="{StaticResource Thumb}" HeightRequest="96" WidthRequest="96">
+                <Grid>
+                    <Image Source="placeholder.png" Opacity="0.5" Margin="20" />
+                    <Image Source="{Binding Thumbnail}" Aspect="AspectFill" />
+                </Grid>
+            </Border>
+            <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                <Entry Text="{Binding EditTitle}" FontSize="22" FontAttributes="Bold" Placeholder="Title" IsReadOnly="{Binding IsReadOnly}" />
+                <Label Text="{Binding FolderPreview}" Style="{StaticResource WarningText}" IsVisible="{Binding FolderPreview, Converter={StaticResource HasValue}}" />
+                <Label Text="{Binding FolderPath}" Style="{StaticResource Muted}" LineBreakMode="MiddleTruncation">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding RevealFolderCommand}" />
+                    </Label.GestureRecognizers>
+                </Label>
+            </VerticalStackLayout>
+            <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
+                <Button Text="Show folder" Command="{Binding RevealFolderCommand}" />
+                <Button Text="Reload" Command="{Binding ReloadCommand}" />
+                <Button Text="Save" Command="{Binding SaveCommand}" Style="{StaticResource TabButtonSelected}" />
+            </HorizontalStackLayout>
+        </Grid>
+
+        <!-- Banners -->
+        <VerticalStackLayout Grid.Row="1" Spacing="6">
+            <Border Style="{StaticResource Banner}" IsVisible="{Binding IsReadOnly}">
+                <Label Text="{Binding ReadOnlyReason, StringFormat='Read-only: {0}'}" />
+            </Border>
+            <Border Style="{StaticResource Banner}" IsVisible="{Binding ChangedElsewhere}">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Label Text="This piece was changed on another computer while you were editing." VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Load their version" Command="{Binding ReloadCommand}" />
+                    <Button Grid.Column="2" Text="Keep mine" Command="{Binding OverwriteCommand}" />
+                </Grid>
+            </Border>
+            <Border Style="{StaticResource Banner}" IsVisible="{Binding Notice, Converter={StaticResource HasValue}}">
+                <Label Text="{Binding Notice}" />
+            </Border>
+        </VerticalStackLayout>
+
+        <!-- Tabs -->
+        <HorizontalStackLayout Grid.Row="2" Spacing="6" x:Name="Tabs">
+            <Button x:Name="TabOverview" Text="Overview" Command="{Binding SelectTabCommand}" CommandParameter="overview" />
+            <Button x:Name="TabFiles" Text="Files" Command="{Binding SelectTabCommand}" CommandParameter="files" />
+            <Button x:Name="TabProducts" Text="Products" Command="{Binding SelectTabCommand}" CommandParameter="products" />
+            <Button x:Name="TabSales" Text="Sales" Command="{Binding SelectTabCommand}" CommandParameter="sales" />
+            <Button x:Name="TabCopyright" Text="Copyright" Command="{Binding SelectTabCommand}" CommandParameter="copyright" />
+        </HorizontalStackLayout>
+
+        <!-- ============ OVERVIEW ============ -->
+        <ScrollView Grid.Row="3" IsVisible="{Binding IsOverview}">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="24" Padding="0,0,0,24">
+                <VerticalStackLayout>
+                    <Label Text="About this piece" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Description" Style="{StaticResource FieldLabel}" />
+                    <Editor Text="{Binding Piece.Description}" AutoSize="TextChanges" MinimumHeightRequest="120" Placeholder="Shown to buyers, e.g. in your shop listing" />
+                    <Label Text="Collections (comma-separated)" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding CollectionsText}" Placeholder="e.g. Birds, Summer 2026" />
+                    <FlexLayout BindableLayout.ItemsSource="{Binding KnownCollections}" Wrap="Wrap" Margin="0,4,0,0">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Button Text="{Binding ., StringFormat='+ {0}'}" FontSize="12" Padding="8,2" Margin="0,0,6,6"
+                                        Command="{Binding AddCollectionCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                        CommandParameter="{Binding .}" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
+                    <Label Text="Tags (comma-separated)" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding TagsText}" Placeholder="e.g. goose, watercolor, pond" />
+                    <Label Text="Created on" Style="{StaticResource FieldLabel}" />
+                    <DatePicker Date="{Binding Piece.CreatedOn, Converter={StaticResource NullableDateOnly}}" HorizontalOptions="Start" />
+                    <Label Text="Notes" Style="{StaticResource FieldLabel}" />
+                    <Editor Text="{Binding Piece.Notes}" AutoSize="TextChanges" MinimumHeightRequest="80" Placeholder="Private notes" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Column="1">
+                    <Label Text="The original" Style="{StaticResource SectionTitle}" />
+                    <HorizontalStackLayout Spacing="6">
+                        <CheckBox IsChecked="{Binding Piece.Artwork.IsDigitalOnly}" VerticalOptions="Center" />
+                        <Label Text="Digital only (no physical original)" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                    <Label Text="Medium" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding Piece.Artwork.Medium}" Placeholder="e.g. Watercolor on paper" />
+                    <Label Text="Dimensions" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding Piece.Artwork.Dimensions}" Placeholder="e.g. 30 × 40 cm" />
+                    <Label Text="Status of the original" Style="{StaticResource FieldLabel}" />
+                    <Picker ItemsSource="{x:Static vm:PieceDetailViewModel.OriginalStatuses}" SelectedItem="{Binding Piece.Artwork.OriginalStatus}"
+                            ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                    <Label Text="{Binding Currency, StringFormat='Price of the original ({0})'}" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding Piece.Artwork.OriginalPrice, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" Placeholder="Not for sale / unknown" />
+                    <Label Text="Sold to" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding Piece.Artwork.SoldTo}" />
+                    <Label Text="Sold on" Style="{StaticResource FieldLabel}" />
+                    <DatePicker Date="{Binding Piece.Artwork.SoldOn, Converter={StaticResource NullableDateOnly}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+            </Grid>
+        </ScrollView>
+
+        <!-- ============ FILES ============ -->
+        <ScrollView Grid.Row="3" IsVisible="{Binding IsFiles}">
+            <VerticalStackLayout Spacing="8" Padding="0,0,0,24">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Files are named {Art_Piece_Name}-{version}.{ext}. Changing a version renames the file on disk. You can also drop files here (Windows)."
+                           Style="{StaticResource Muted}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Add files…" Command="{Binding AddFilesCommand}" />
+                </Grid>
+
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Files}" Spacing="8">
+                    <BindableLayout.EmptyView>
+                        <Label Text="No files yet. Add the photo of the artwork, the edited master, transparent versions…" Style="{StaticResource Muted}" Margin="0,12" />
+                    </BindableLayout.EmptyView>
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FileRowViewModel">
+                            <Border Style="{StaticResource Card}" Padding="8">
+                                <Grid ColumnDefinitions="64,*,160,Auto" ColumnSpacing="12">
+                                    <Border Style="{StaticResource Thumb}" HeightRequest="64" WidthRequest="64">
+                                        <Image Source="{Binding Thumbnail}" Aspect="AspectFill" />
+                                    </Border>
+                                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                                        <Label Text="{Binding Entry.FileName}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
+                                        <HorizontalStackLayout Spacing="6">
+                                            <Label Text="Version" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                                            <Entry Text="{Binding EditVersion}" WidthRequest="200" />
+                                            <Button Text="Rename" IsVisible="{Binding VersionChanged}"
+                                                    Command="{Binding RenameVersionCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                            <Label Text="{Binding SizeText}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                                        </HorizontalStackLayout>
+                                        <Label Text="⚠ Missing on disk: moved, renamed or deleted outside ArtGander" Style="{StaticResource WarningText}" IsVisible="{Binding IsMissing}" />
+                                        <HorizontalStackLayout Spacing="6" IsVisible="{Binding IsMisnamed}">
+                                            <Label Text="⚠ Doesn't follow the naming convention" Style="{StaticResource WarningText}" VerticalOptions="Center" />
+                                            <Button Text="Fix name" FontSize="12" Padding="8,2"
+                                                    Command="{Binding ApplyConventionCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                        </HorizontalStackLayout>
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Grid.Column="2" VerticalOptions="Center">
+                                        <Label Text="Kind" Style="{StaticResource FieldLabel}" Margin="0" />
+                                        <Picker ItemsSource="{x:Static vm:PieceDetailViewModel.FileKinds}" SelectedItem="{Binding Entry.Kind}"
+                                                ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                    </VerticalStackLayout>
+                                    <HorizontalStackLayout Grid.Column="3" Spacing="6" VerticalOptions="Center">
+                                        <Button Text="Open" Command="{Binding OpenFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                        <Button Text="Show" Command="{Binding RevealFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                        <Button Text="Remove" Command="{Binding UntrackFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                    </HorizontalStackLayout>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <Label Text="New files found in the folder" Style="{StaticResource SectionTitle}" IsVisible="{Binding Untracked.Count, Converter={StaticResource HasValue}}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Untracked}" Spacing="6">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UntrackedFileViewModel">
+                            <Border Style="{StaticResource Banner}">
+                                <Grid ColumnDefinitions="*,200,160,Auto" ColumnSpacing="10">
+                                    <Label Text="{Binding FileName}" VerticalOptions="Center" LineBreakMode="MiddleTruncation" />
+                                    <Entry Grid.Column="1" Text="{Binding Version}" Placeholder="version" />
+                                    <Picker Grid.Column="2" ItemsSource="{x:Static vm:PieceDetailViewModel.FileKinds}" SelectedItem="{Binding Kind}"
+                                            ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                    <HorizontalStackLayout Grid.Column="3" Spacing="6">
+                                        <Button Text="Track &amp; rename" Command="{Binding TrackFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                        <Button Text="Track as is" Command="{Binding TrackFileAsIsCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                    </HorizontalStackLayout>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- ============ PRODUCTS ============ -->
+        <ScrollView Grid.Row="3" IsVisible="{Binding IsProducts}">
+            <VerticalStackLayout Spacing="12" Padding="0,0,0,24">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Products are what you sell: the original, self-printed copies, Printify products… Link each one to the files it is made from."
+                           Style="{StaticResource Muted}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Add product" Command="{Binding AddProductCommand}" />
+                </Grid>
+
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Products}" Spacing="12">
+                    <BindableLayout.EmptyView>
+                        <Label Text="No products yet." Style="{StaticResource Muted}" Margin="0,12" />
+                    </BindableLayout.EmptyView>
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProductViewModel">
+                            <Border Style="{StaticResource Card}">
+                                <VerticalStackLayout Spacing="4">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Label Text="{Binding Header}" FontSize="17" FontAttributes="Bold" VerticalOptions="Center" />
+                                        <Button Grid.Column="1" Text="Remove product"
+                                                Command="{Binding RemoveProductCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="2*,*,*,*" ColumnSpacing="12">
+                                        <VerticalStackLayout>
+                                            <Label Text="Name" Style="{StaticResource FieldLabel}" />
+                                            <Entry Text="{Binding Product.Name}" Placeholder="e.g. A4 giclée print, T-shirt, Sticker" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1">
+                                            <Label Text="Type" Style="{StaticResource FieldLabel}" />
+                                            <Picker ItemsSource="{x:Static vm:PieceDetailViewModel.ProductTypes}" SelectedItem="{Binding Product.Type}"
+                                                    ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="2">
+                                            <Label Text="Provider" Style="{StaticResource FieldLabel}" />
+                                            <Entry Text="{Binding Product.Provider}" Placeholder="self, Printify…" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="3">
+                                            <Label Text="Variant / size" Style="{StaticResource FieldLabel}" />
+                                            <Entry Text="{Binding Product.Variant}" Placeholder="e.g. A4, M, 11oz" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12">
+                                        <VerticalStackLayout>
+                                            <Label Text="Price" Style="{StaticResource FieldLabel}" />
+                                            <Entry Text="{Binding Product.Price, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1">
+                                            <Label Text="Production cost" Style="{StaticResource FieldLabel}" />
+                                            <Entry Text="{Binding Product.ProductionCost, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="2">
+                                            <Label Text="Margin" Style="{StaticResource FieldLabel}" />
+                                            <Label Text="{Binding Product.Margin, Converter={StaticResource Money}}" Margin="0,10,0,0" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="3">
+                                            <Label Text="Edition size" Style="{StaticResource FieldLabel}" />
+                                            <Entry Text="{Binding Product.EditionSize, Converter={StaticResource NullableInt}}" Keyboard="Numeric" Placeholder="open" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="4">
+                                            <Label Text="In stock" Style="{StaticResource FieldLabel}" />
+                                            <Entry Text="{Binding Product.Stock, Converter={StaticResource NullableInt}}" Keyboard="Numeric" Placeholder="on demand" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+
+                                    <Label Text="Files used for this product" Style="{StaticResource FieldLabel}" />
+                                    <FlexLayout BindableLayout.ItemsSource="{Binding FileLinks}" Wrap="Wrap">
+                                        <BindableLayout.EmptyView>
+                                            <Label Text="Add files on the Files tab first." Style="{StaticResource Muted}" />
+                                        </BindableLayout.EmptyView>
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ProductFileLink">
+                                                <HorizontalStackLayout Margin="0,0,16,0">
+                                                    <CheckBox IsChecked="{Binding IsLinked}" VerticalOptions="Center" />
+                                                    <Label Text="{Binding Label}" VerticalOptions="Center" />
+                                                </HorizontalStackLayout>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </FlexLayout>
+                                    <Label Text="{Binding MissingLinksText}" Style="{StaticResource WarningText}" IsVisible="{Binding MissingLinksText, Converter={StaticResource HasValue}}" />
+
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                                        <Label Text="Cost breakdown" Style="{StaticResource FieldLabel}" VerticalOptions="Center" />
+                                        <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                            <Button Text="Add cost line" FontSize="12" Padding="8,2" Command="{Binding AddCostLineCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                            <Button Text="Use total as cost" FontSize="12" Padding="8,2" Command="{Binding SumCostsCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                        </HorizontalStackLayout>
+                                    </Grid>
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Product.CostBreakdown}" Spacing="4">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="m:CostLine">
+                                                <Grid ColumnDefinitions="*,120,Auto" ColumnSpacing="8">
+                                                    <Entry Text="{Binding Label}" Placeholder="e.g. paper, ink, shipping, Printify base cost" />
+                                                    <Entry Grid.Column="1" Text="{Binding Amount, Converter={StaticResource Decimal}}" Keyboard="Numeric" />
+                                                    <Button Grid.Column="2" Text="✕" Command="{Binding RemoveCostLineCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                                        <Label Text="Where it's sold" Style="{StaticResource FieldLabel}" VerticalOptions="Center" />
+                                        <Button Grid.Column="1" Text="Add listing" FontSize="12" Padding="8,2" Command="{Binding AddListingCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                    </Grid>
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Product.Listings}" Spacing="4">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="m:Listing">
+                                                <Grid ColumnDefinitions="130,*,140,100,110,Auto,Auto" ColumnSpacing="8">
+                                                    <Picker ItemsSource="{Binding Channels, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" SelectedItem="{Binding Channel}" />
+                                                    <Entry Grid.Column="1" Text="{Binding Url}" Placeholder="Listing URL" />
+                                                    <Entry Grid.Column="2" Text="{Binding ExternalId}" Placeholder="Product / SKU ID" />
+                                                    <Entry Grid.Column="3" Text="{Binding Price, Converter={StaticResource NullableDecimal}}" Placeholder="Price" Keyboard="Numeric" />
+                                                    <Picker Grid.Column="4" ItemsSource="{x:Static vm:PieceDetailViewModel.ListingStatuses}" SelectedItem="{Binding Status}"
+                                                            ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                                    <Button Grid.Column="5" Text="Open" Command="{Binding OpenUrlCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding Url}" />
+                                                    <Button Grid.Column="6" Text="✕" Command="{Binding RemoveListingCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+
+                                    <Label Text="Notes" Style="{StaticResource FieldLabel}" />
+                                    <Editor Text="{Binding Product.Notes}" AutoSize="TextChanges" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- ============ SALES ============ -->
+        <ScrollView Grid.Row="3" IsVisible="{Binding IsSales}">
+            <VerticalStackLayout Spacing="8" Padding="0,0,0,24">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Label Text="{Binding SalesSummary}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Recalculate" Command="{Binding RefreshSalesSummaryCommand}" />
+                    <Button Grid.Column="2" Text="Add sale" Command="{Binding AddSaleCommand}" />
+                </Grid>
+                <Label Text="Tip: lines with the same order number form one order. Record payment, shipping, tax and tracking for the whole order on the Orders page." Style="{StaticResource Muted}" />
+
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Sales}" Spacing="8">
+                    <BindableLayout.EmptyView>
+                        <Label Text="No sales yet." Style="{StaticResource Muted}" Margin="0,12" />
+                    </BindableLayout.EmptyView>
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SaleViewModel">
+                            <Border Style="{StaticResource Card}" Padding="10">
+                                <VerticalStackLayout Spacing="2">
+                                    <Grid ColumnDefinitions="140,130,130,*,70,100,90,100" ColumnSpacing="8">
+                                        <Label Text="Date" Style="{StaticResource FieldLabel}" />
+                                        <Label Grid.Column="1" Text="Order #" Style="{StaticResource FieldLabel}" />
+                                        <Label Grid.Column="2" Text="Channel" Style="{StaticResource FieldLabel}" />
+                                        <Label Grid.Column="3" Text="Product" Style="{StaticResource FieldLabel}" />
+                                        <Label Grid.Column="4" Text="Qty" Style="{StaticResource FieldLabel}" />
+                                        <Label Grid.Column="5" Text="Unit price" Style="{StaticResource FieldLabel}" />
+                                        <Label Grid.Column="6" Text="Fees" Style="{StaticResource FieldLabel}" />
+                                        <Label Grid.Column="7" Text="Unit cost" Style="{StaticResource FieldLabel}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="140,130,130,*,70,100,90,100" ColumnSpacing="8">
+                                        <DatePicker Date="{Binding Sale.Date, Converter={StaticResource DateOnly}}" />
+                                        <Entry Grid.Column="1" Text="{Binding Sale.OrderRef}" Placeholder="#1001" />
+                                        <Picker Grid.Column="2" ItemsSource="{Binding Channels, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" SelectedItem="{Binding Sale.Channel}" />
+                                        <Picker Grid.Column="3" ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}"
+                                                ItemDisplayBinding="{Binding Name, x:DataType=m:Product}" />
+                                        <Entry Grid.Column="4" Text="{Binding Sale.Quantity, Converter={StaticResource Int}}" Keyboard="Numeric" />
+                                        <Entry Grid.Column="5" Text="{Binding Sale.UnitPrice, Converter={StaticResource Decimal}}" Keyboard="Numeric" />
+                                        <Entry Grid.Column="6" Text="{Binding Sale.Fees, Converter={StaticResource Decimal}}" Keyboard="Numeric" />
+                                        <Entry Grid.Column="7" Text="{Binding Sale.UnitCost, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" Placeholder="product" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*,*,Auto,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+                                        <Entry Text="{Binding Sale.Customer}" Placeholder="Customer" />
+                                        <Entry Grid.Column="1" Text="{Binding Sale.Notes}" Placeholder="Notes" />
+                                        <Label Grid.Column="2" Text="{Binding Revenue, StringFormat='= {0:N2}'}" VerticalOptions="Center" FontAttributes="Bold" />
+                                        <Button Grid.Column="3" Text="Remove" Command="{Binding RemoveSaleCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- ============ COPYRIGHT ============ -->
+        <ScrollView Grid.Row="3" IsVisible="{Binding IsCopyright}">
+            <VerticalStackLayout MaximumWidthRequest="640" HorizontalOptions="Start" Padding="0,0,0,24">
+                <Label Text="Copyright" Style="{StaticResource SectionTitle}" />
+                <Label Text="Owner" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding Piece.Copyright.Owner}" />
+                <Label Text="Year" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding Piece.Copyright.Year, Converter={StaticResource NullableInt}}" Keyboard="Numeric" WidthRequest="120" HorizontalOptions="Start" />
+                <Label Text="Registration status" Style="{StaticResource FieldLabel}" />
+                <Picker ItemsSource="{x:Static vm:PieceDetailViewModel.CopyrightStatuses}" SelectedItem="{Binding Piece.Copyright.Status}"
+                        ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" WidthRequest="240" HorizontalOptions="Start" />
+                <Label Text="Registration number" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding Piece.Copyright.RegistrationNumber}" />
+                <Label Text="Registered on" Style="{StaticResource FieldLabel}" />
+                <DatePicker Date="{Binding Piece.Copyright.RegisteredOn, Converter={StaticResource NullableDateOnly}}" HorizontalOptions="Start" />
+                <Label Text="Office / registry" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding Piece.Copyright.Office}" Placeholder="e.g. a copyright office, i-DEPOT, a registration service" />
+                <Label Text="Notes" Style="{StaticResource FieldLabel}" />
+                <Editor Text="{Binding Piece.Copyright.Notes}" AutoSize="TextChanges" MinimumHeightRequest="80" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

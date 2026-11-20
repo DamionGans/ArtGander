@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <!-- A small palette. Controls keep their native platform look; these colors are only for accents and status. -->
+    <Color x:Key="Pond">#2F5D50</Color>
+    <Color x:Key="PondLight">#7FB5A3</Color>
+    <Color x:Key="Beak">#F29A2E</Color>
+    <Color x:Key="Beret">#D8433B</Color>
+    <Color x:Key="Warning">#B7791F</Color>
+    <Color x:Key="WarningDark">#F6C26B</Color>
+
+    <Color x:Key="CardLight">#FFFFFF</Color>
+    <Color x:Key="CardDark">#262626</Color>
+    <Color x:Key="StrokeLight">#DDDDDD</Color>
+    <Color x:Key="StrokeDark">#3A3A3A</Color>
+    <Color x:Key="MutedLight">#6B6B6B</Color>
+    <Color x:Key="MutedDark">#A8A8A8</Color>
+    <Color x:Key="ThumbLight">#EFEDE8</Color>
+    <Color x:Key="ThumbDark">#333333</Color>
+</ResourceDictionary>

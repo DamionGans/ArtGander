@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:views="clr-namespace:ArtGander.App.Views"
+       x:Class="ArtGander.App.AppShell"
+       Title="ArtGander"
+       FlyoutBehavior="Locked"
+       FlyoutWidth="200">
+
+    <Shell.FlyoutHeader>
+        <VerticalStackLayout Padding="16,20,16,12" Spacing="2">
+            <Label Text="ArtGander" FontSize="20" FontAttributes="Bold" />
+            <Label Text="Artistic Goose On The Loose" Style="{StaticResource Muted}" FontSize="11" />
+        </VerticalStackLayout>
+    </Shell.FlyoutHeader>
+
+    <FlyoutItem Title="Library">
+        <ShellContent Route="library" ContentTemplate="{DataTemplate views:LibraryPage}" />
+    </FlyoutItem>
+    <FlyoutItem Title="Orders">
+        <ShellContent Route="orders" ContentTemplate="{DataTemplate views:OrdersPage}" />
+    </FlyoutItem>
+    <FlyoutItem Title="Collections">
+        <ShellContent Route="collections" ContentTemplate="{DataTemplate views:CollectionsPage}" />
+    </FlyoutItem>
+    <FlyoutItem Title="Settings">
+        <ShellContent Route="settings" ContentTemplate="{DataTemplate views:SettingsPage}" />
+    </FlyoutItem>
+</Shell>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             x:Class="ArtGander.App.Views.LibraryPage"
+             Shell.NavBarIsVisible="False"
+             x:DataType="vm:LibraryViewModel"
+             Title="Library">
+
+    <ContentPage.MenuBarItems>
+        <MenuBarItem Text="File">
+            <MenuFlyoutItem Text="New Art Piece…" Command="{Binding NewPieceCommand}">
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="{OnPlatform WinUI=Ctrl, MacCatalyst=Cmd}" Key="N" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem Text="Refresh" Command="{Binding RefreshCommand}">
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="{OnPlatform WinUI=Ctrl, MacCatalyst=Cmd}" Key="R" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem Text="Choose Art Folder…" Command="{Binding ChooseFolderCommand}" />
+        </MenuBarItem>
+    </ContentPage.MenuBarItems>
+
+    <Grid RowDefinitions="Auto,Auto,*" Padding="24,16,24,0" RowSpacing="12">
+
+        <!-- Header and toolbar -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <VerticalStackLayout VerticalOptions="Center">
+                <Label Text="Library" Style="{StaticResource PageTitle}" />
+                <Label Text="{Binding Summary}" Style="{StaticResource Muted}" />
+            </VerticalStackLayout>
+            <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                <ActivityIndicator IsRunning="{Binding IsScanning}" IsVisible="{Binding IsScanning}" HeightRequest="20" WidthRequest="20" />
+                <Button Text="Refresh" Command="{Binding RefreshCommand}" />
+                <Button Text="New art piece" Command="{Binding NewPieceCommand}" />
+            </HorizontalStackLayout>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,220,Auto" ColumnSpacing="12" IsVisible="{Binding HasRoot}">
+            <SearchBar Placeholder="Search titles, descriptions, tags, products…" Text="{Binding SearchText}" />
+            <Picker Grid.Column="1" ItemsSource="{Binding CollectionFilters}" SelectedItem="{Binding SelectedCollection}" />
+            <HorizontalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center">
+                <CheckBox IsChecked="{Binding AttentionOnly}" VerticalOptions="Center" />
+                <Label Text="Needs attention" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+        </Grid>
+
+        <!-- Content -->
+        <Grid Grid.Row="2">
+            <!-- No folder chosen yet -->
+            <VerticalStackLayout IsVisible="{Binding HasRoot, Converter={StaticResource Not}}" VerticalOptions="Center" HorizontalOptions="Center" Spacing="12" MaximumWidthRequest="460">
+                <Image Source="placeholder.png" HeightRequest="96" WidthRequest="96" />
+                <Label Text="Welcome to ArtGander" FontSize="22" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                <Label Text="Choose the folder where your art lives. It can be on this computer or on a network drive shared with your other computers. Each art piece gets its own subfolder there."
+                       HorizontalTextAlignment="Center" Style="{StaticResource Muted}" />
+                <Button Text="Choose art folder…" Command="{Binding ChooseFolderCommand}" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+
+            <!-- Empty library -->
+            <VerticalStackLayout IsVisible="{Binding IsEmpty}" VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <Label Text="Nothing here yet. The goose is still on the loose." FontSize="18" HorizontalTextAlignment="Center" />
+                <Button Text="Create your first art piece" Command="{Binding NewPieceCommand}" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+
+            <Label IsVisible="{Binding NoMatches}" Text="No art pieces match your filters." Style="{StaticResource Muted}" HorizontalOptions="Center" Margin="0,40" />
+
+            <CollectionView x:Name="Grid" ItemsSource="{Binding Items}" SelectionMode="None">
+                <CollectionView.ItemsLayout>
+                    <GridItemsLayout Orientation="Vertical" Span="5" HorizontalItemSpacing="14" VerticalItemSpacing="14" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.Footer>
+                    <BoxView HeightRequest="24" Color="Transparent" />
+                </CollectionView.Footer>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PieceItemViewModel">
+                        <Border Style="{StaticResource Card}" Padding="0">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, x:DataType=vm:LibraryViewModel}"
+                                                      CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <Grid RowDefinitions="180,Auto">
+                                <Border Style="{StaticResource Thumb}" StrokeShape="RoundRectangle 8,8,0,0">
+                                    <Grid>
+                                        <Image Source="placeholder.png" Aspect="AspectFit" Opacity="0.5" Margin="40" />
+                                        <Image Source="{Binding Thumbnail}" Aspect="AspectFill" />
+                                    </Grid>
+                                </Border>
+                                <VerticalStackLayout Grid.Row="1" Padding="12,10" Spacing="2">
+                                    <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" LineBreakMode="TailTruncation" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Label Text="{Binding AttentionText}" Style="{StaticResource WarningText}" LineBreakMode="TailTruncation" />
+                                        <Label Grid.Column="1" Text="{Binding StatusText}" Style="{StaticResource Muted}" />
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:conv="clr-namespace:ArtGander.App.Converters"
+             x:Class="ArtGander.App.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <conv:NullableDecimalConverter x:Key="NullableDecimal" />
+            <conv:DecimalConverter x:Key="Decimal" />
+            <conv:NullableIntConverter x:Key="NullableInt" />
+            <conv:IntConverter x:Key="Int" />
+            <conv:DateOnlyConverter x:Key="DateOnly" />
+            <conv:NullableDateOnlyConverter x:Key="NullableDateOnly" />
+            <conv:HumanizeConverter x:Key="Humanize" />
+            <conv:MoneyConverter x:Key="Money" />
+            <conv:NotNullOrEmptyConverter x:Key="HasValue" />
+            <conv:InverseBoolConverter x:Key="Not" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

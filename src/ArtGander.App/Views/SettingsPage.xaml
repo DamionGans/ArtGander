@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             x:Class="ArtGander.App.Views.SettingsPage"
+             Shell.NavBarIsVisible="False"
+             x:DataType="vm:SettingsViewModel"
+             Title="Settings">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24,16" Spacing="4" MaximumWidthRequest="720" HorizontalOptions="Start">
+            <Label Text="Settings" Style="{StaticResource PageTitle}" />
+
+            <Label Text="Art folder" Style="{StaticResource SectionTitle}" />
+            <Label Text="The folder that holds one subfolder per art piece. Use a network drive to share it between your Windows and Mac computers."
+                   Style="{StaticResource Muted}" />
+            <Label Text="{Binding RootPath}" Margin="0,6" LineBreakMode="MiddleTruncation" />
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="Choose art folder…" Command="{Binding ChooseFolderCommand}" />
+                <Button Text="Show in file manager" Command="{Binding RevealFolderCommand}" IsEnabled="{Binding HasRoot}" />
+            </HorizontalStackLayout>
+
+            <VerticalStackLayout IsVisible="{Binding HasRoot}">
+                <Label Text="Library defaults" Style="{StaticResource SectionTitle}" />
+                <Label Text="Stored in the art folder (.artgander/library.json), so every computer uses the same defaults." Style="{StaticResource Muted}" />
+                <Label Text="Currency (e.g. EUR, USD)" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding DefaultCurrency}" WidthRequest="120" HorizontalOptions="Start" MaxLength="3" />
+                <Label Text="Default copyright owner for new pieces" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding DefaultCopyrightOwner}" Placeholder="Your name or studio name" />
+                <Label Text="Sales channels (comma-separated)" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding Channels}" Placeholder="shopify, printify, inPerson, other" />
+                <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" Margin="0,12,0,0" />
+                <Label Text="{Binding Status}" Style="{StaticResource Muted}" IsVisible="{Binding Status, Converter={StaticResource HasValue}}" />
+            </VerticalStackLayout>
+
+            <Label Text="About" Style="{StaticResource SectionTitle}" />
+            <Label Text="{Binding Version}" />
+            <Label Text="{Binding FormatVersion}" Style="{StaticResource Muted}" />
+            <Label Text="Made for an artistic goose on the loose. Honk responsibly." Style="{StaticResource Muted}" Margin="0,8,0,0" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

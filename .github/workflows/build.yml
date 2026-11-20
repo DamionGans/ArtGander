@@ -1,0 +1,133 @@
+name: Build
+
+# Every push and pull request: run tests, then build optimized Release installers for Windows and macOS.
+# Pushing a tag like v1.2.3 also publishes a GitHub Release with the installers attached.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            base=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)
+            echo "version=$base" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Test core library
+        run: dotnet test --project tests/ArtGander.Core.Tests -c Release
+
+  windows:
+    needs: [version, test]
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install MAUI workload
+        run: dotnet workload install maui-windows
+      - name: Publish (Release, self-contained, ReadyToRun)
+        run: >
+          dotnet publish src/ArtGander.App/ArtGander.App.csproj
+          -c Release -f net11.0-windows10.0.19041.0 -r win-${{ matrix.arch }}
+          -p:Version=${{ needs.version.outputs.version }}
+          -p:ApplicationVersion=${{ github.run_number }}
+          -o artifacts/publish/win-${{ matrix.arch }}
+      - name: Install Inno Setup
+        shell: pwsh
+        run: if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Build installer
+        shell: pwsh
+        run: >
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          /DAppVersion=${{ needs.version.outputs.version }}
+          /DArch=${{ matrix.arch }}
+          "/DSourceDir=$env:GITHUB_WORKSPACE\artifacts\publish\win-${{ matrix.arch }}"
+          "/DOutputDir=$env:GITHUB_WORKSPACE\artifacts\installers"
+          installers\windows\ArtGander.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArtGander-windows-${{ matrix.arch }}
+          path: artifacts/installers/*.exe
+          if-no-files-found: error
+
+  macos:
+    needs: [version, test]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install MAUI workload
+        run: dotnet workload install maui-maccatalyst
+      - name: Publish (Release, universal app)
+        run: >
+          dotnet publish src/ArtGander.App/ArtGander.App.csproj
+          -c Release -f net11.0-maccatalyst
+          -p:Version=${{ needs.version.outputs.version }}
+          -p:ApplicationVersion=${{ github.run_number }}
+      - name: Build DMG
+        env:
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          APP=$(find src/ArtGander.App/bin/Release/net11.0-maccatalyst -name "ArtGander.app" -type d -prune | head -n 1)
+          echo "App bundle: $APP"
+          chmod +x installers/macos/make-dmg.sh
+          installers/macos/make-dmg.sh "$APP" "${{ needs.version.outputs.version }}" artifacts/installers
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArtGander-macos
+          path: artifacts/installers/*.dmg
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ArtGander ${{ needs.version.outputs.version }}
+          files: dist/*
+          generate_release_notes: true

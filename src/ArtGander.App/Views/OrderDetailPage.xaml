@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             xmlns:st="clr-namespace:ArtGander.Core.Storage;assembly=ArtGander.Core"
+             xmlns:m="clr-namespace:ArtGander.Core.Model;assembly=ArtGander.Core"
+             x:Class="ArtGander.App.Views.OrderDetailPage"
+             x:DataType="vm:OrderDetailViewModel"
+             Title="{Binding Order.OrderRef, StringFormat='Order {0}'}">
+
+    <ContentPage.MenuBarItems>
+        <MenuBarItem Text="File">
+            <MenuFlyoutItem Text="Save Order" Command="{Binding SaveCommand}">
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="{OnPlatform WinUI=Ctrl, MacCatalyst=Cmd}" Key="S" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+        </MenuBarItem>
+    </ContentPage.MenuBarItems>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24,16,24,32" Spacing="4">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <VerticalStackLayout VerticalOptions="Center">
+                    <Label Text="{Binding Order.OrderRef, StringFormat='Order {0}'}" Style="{StaticResource PageTitle}" />
+                    <Label Text="{Binding Summary}" Style="{StaticResource Muted}" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                    <Button Text="Delete" Command="{Binding DeleteCommand}" />
+                    <Button Text="Save" Command="{Binding SaveCommand}" Style="{StaticResource TabButtonSelected}" />
+                </HorizontalStackLayout>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
+                <!-- Order -->
+                <VerticalStackLayout>
+                    <Label Text="Order" Style="{StaticResource SectionTitle}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout>
+                            <Label Text="Order number" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding Order.OrderRef}" Placeholder="e.g. #1001 (Shopify order number)" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Date" Style="{StaticResource FieldLabel}" />
+                            <DatePicker Date="{Binding Order.Date, Converter={StaticResource DateOnly}}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout>
+                            <Label Text="Channel" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding Channels}" SelectedItem="{Binding Order.Channel}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Status" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{x:Static vm:OrderDetailViewModel.Statuses}" SelectedItem="{Binding Order.Status}"
+                                    ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label Text="Customer" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding Order.Customer}" />
+
+                    <Label Text="Payment" Style="{StaticResource SectionTitle}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout>
+                            <Label Text="Customer paid (total)" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding Order.AmountPaid, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" Placeholder="sum of items" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="…of which tax (optional)" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding Order.AmountPaidTax, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Label Text="Notes" Style="{StaticResource FieldLabel}" />
+                    <Editor Text="{Binding Order.Notes}" AutoSize="TextChanges" MinimumHeightRequest="60" />
+                </VerticalStackLayout>
+
+                <!-- Costs and shipping -->
+                <VerticalStackLayout Grid.Column="1">
+                    <Label Text="Production" Style="{StaticResource SectionTitle}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout>
+                            <Label Text="Production cost" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding Order.ProductionCost, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" Placeholder="from products" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Tax on production (optional)" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding Order.ProductionTax, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label Text="Leave the production cost empty to use the products' own production costs." Style="{StaticResource Muted}" />
+
+                    <Label Text="Shipping" Style="{StaticResource SectionTitle}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout>
+                            <Label Text="Shipping cost" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding Order.ShippingCost, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Tax on shipping (optional)" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding Order.ShippingTax, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout>
+                            <Label Text="Delivery provider" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{x:Static vm:OrderDetailViewModel.CarrierOptions}" SelectedItem="{Binding Order.Carrier}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Shipped on" Style="{StaticResource FieldLabel}" />
+                            <DatePicker Date="{Binding Order.ShippedOn, Converter={StaticResource NullableDateOnly}}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label Text="Tracking code" Style="{StaticResource FieldLabel}" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Entry Text="{Binding Order.TrackingCode}" />
+                        <Button Grid.Column="1" Text="Track" Command="{Binding TrackCommand}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Grid>
+
+            <!-- Items -->
+            <Label Text="Items" Style="{StaticResource SectionTitle}" />
+            <Label Text="Each item is stored as a sale on its art piece. An order can contain items from several pieces." Style="{StaticResource Muted}" />
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="6" Margin="0,6">
+                <BindableLayout.EmptyView>
+                    <Label Text="No items yet." Style="{StaticResource Muted}" />
+                </BindableLayout.EmptyView>
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="vm:OrderItemRow">
+                        <Border Style="{StaticResource Card}" Padding="10,6">
+                            <Grid ColumnDefinitions="*,*,100,Auto,Auto" ColumnSpacing="10">
+                                <Label Text="{Binding PieceTitle}" FontAttributes="Bold" VerticalOptions="Center" />
+                                <Label Grid.Column="1" Text="{Binding Summary}" VerticalOptions="Center" />
+                                <Label Grid.Column="2" Text="{Binding Total, StringFormat='{0:N2}'}" HorizontalTextAlignment="End" VerticalOptions="Center" />
+                                <Button Grid.Column="3" Text="Open piece"
+                                        Command="{Binding OpenPieceCommand, Source={RelativeSource AncestorType={x:Type vm:OrderDetailViewModel}}, x:DataType=vm:OrderDetailViewModel}" CommandParameter="{Binding .}" />
+                                <Button Grid.Column="4" Text="Remove"
+                                        Command="{Binding RemoveItemCommand, Source={RelativeSource AncestorType={x:Type vm:OrderDetailViewModel}}, x:DataType=vm:OrderDetailViewModel}" CommandParameter="{Binding .}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="2*,2*,80,100,Auto" ColumnSpacing="10">
+                    <VerticalStackLayout>
+                        <Label Text="Art piece" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding Pieces}" SelectedItem="{Binding NewItemPiece}"
+                                ItemDisplayBinding="{Binding Piece.Title, x:DataType=st:ArtPieceDocument}" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1">
+                        <Label Text="Product" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding PieceProducts}" SelectedItem="{Binding NewItemProduct}"
+                                ItemDisplayBinding="{Binding Name, x:DataType=m:Product}" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="2">
+                        <Label Text="Qty" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding NewItemQuantity}" Keyboard="Numeric" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="3">
+                        <Label Text="Unit price" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding NewItemPrice}" Keyboard="Numeric" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="4" Text="Add item" Command="{Binding AddItemCommand}" VerticalOptions="End" />
+                </Grid>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

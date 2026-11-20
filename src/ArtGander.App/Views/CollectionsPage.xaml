@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             x:Class="ArtGander.App.Views.CollectionsPage"
+             Shell.NavBarIsVisible="False"
+             x:DataType="vm:CollectionsViewModel"
+             Title="Collections">
+
+    <Grid RowDefinitions="Auto,*" Padding="24,16,24,0" RowSpacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+            <VerticalStackLayout>
+                <Label Text="Collections" Style="{StaticResource PageTitle}" />
+                <Label Text="Group art pieces into collections. A piece can belong to several. Assign collections on the piece's Overview tab."
+                       Style="{StaticResource Muted}" />
+            </VerticalStackLayout>
+            <Button Grid.Column="1" Text="New collection" Command="{Binding AddCommand}" VerticalOptions="Center" />
+        </Grid>
+
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Collections}" SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="No collections yet." Style="{StaticResource Muted}" HorizontalOptions="Center" Margin="0,40" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:CollectionRow">
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,8">
+                        <Grid ColumnDefinitions="220,*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout VerticalOptions="Center">
+                                <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="16" />
+                                <Label Text="{Binding CountText}" Style="{StaticResource Muted}" />
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding Description}" Placeholder="Description (optional)" VerticalOptions="Center"
+                                   Unfocused="OnDescriptionUnfocused" />
+                            <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center">
+                                <Button Text="Show pieces" Command="{Binding ShowCommand, Source={RelativeSource AncestorType={x:Type vm:CollectionsViewModel}}, x:DataType=vm:CollectionsViewModel}" CommandParameter="{Binding .}" />
+                                <Button Text="Rename" Command="{Binding RenameCommand, Source={RelativeSource AncestorType={x:Type vm:CollectionsViewModel}}, x:DataType=vm:CollectionsViewModel}" CommandParameter="{Binding .}" />
+                                <Button Text="Delete" Command="{Binding DeleteCommand, Source={RelativeSource AncestorType={x:Type vm:CollectionsViewModel}}, x:DataType=vm:CollectionsViewModel}" CommandParameter="{Binding .}" />
+                            </HorizontalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

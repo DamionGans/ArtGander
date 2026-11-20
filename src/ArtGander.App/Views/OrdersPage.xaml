@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             xmlns:s="clr-namespace:ArtGander.Core.Services;assembly=ArtGander.Core"
+             x:Class="ArtGander.App.Views.OrdersPage"
+             Shell.NavBarIsVisible="False"
+             x:DataType="vm:OrdersViewModel"
+             Title="Orders">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="24,16,24,0" RowSpacing="12">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <VerticalStackLayout>
+                <Label Text="Orders" Style="{StaticResource PageTitle}" />
+                <Label Text="All orders across your library. Open an order to record payment, production and shipping costs, tax, and tracking."
+                       Style="{StaticResource Muted}" />
+            </VerticalStackLayout>
+            <Button Grid.Column="1" Text="New order" Command="{Binding NewOrderCommand}" VerticalOptions="Center" />
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,180,180" ColumnSpacing="12">
+            <SearchBar Placeholder="Search piece, order #, customer, product, tracking…" Text="{Binding SearchText}" />
+            <Picker Grid.Column="1" ItemsSource="{x:Static vm:OrdersViewModel.Periods}" SelectedItem="{Binding Period}" />
+            <Picker Grid.Column="2" ItemsSource="{Binding ChannelFilters}" SelectedItem="{Binding Channel}" />
+        </Grid>
+
+        <!-- Totals -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*,*,*,*" ColumnSpacing="10">
+            <Border Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Orders" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Orders}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
+            <Border Grid.Column="1" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Revenue (excl. tax)" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Revenue, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
+            <Border Grid.Column="2" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Tax collected" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.TaxCollected, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
+            <Border Grid.Column="3" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Production" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Cost, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
+            <Border Grid.Column="4" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Shipping" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Shipping, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
+            <Border Grid.Column="5" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Fees" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Fees, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
+            <Border Grid.Column="6" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="{Binding Currency, StringFormat='Profit ({0})'}" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Profit, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource Pond}, Dark={StaticResource PondLight}}" /></VerticalStackLayout></Border>
+        </Grid>
+
+        <Grid Grid.Row="3" ColumnDefinitions="100,110,90,*,160,50,90,90,90" ColumnSpacing="8" Padding="12,0">
+            <Label Text="Date" Style="{StaticResource FieldLabel}" />
+            <Label Grid.Column="1" Text="Order #" Style="{StaticResource FieldLabel}" />
+            <Label Grid.Column="2" Text="Status" Style="{StaticResource FieldLabel}" />
+            <Label Grid.Column="3" Text="Pieces · customer" Style="{StaticResource FieldLabel}" />
+            <Label Grid.Column="4" Text="Tracking" Style="{StaticResource FieldLabel}" />
+            <Label Grid.Column="5" Text="Items" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
+            <Label Grid.Column="6" Text="Revenue" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
+            <Label Grid.Column="7" Text="All costs" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
+            <Label Grid.Column="8" Text="Profit" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
+        </Grid>
+
+        <CollectionView Grid.Row="4" ItemsSource="{Binding Orders}" SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="No orders in this period." Style="{StaticResource Muted}" HorizontalOptions="Center" Margin="0,40" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="s:OrderSummary">
+                    <Border Style="{StaticResource Card}" Padding="12,8" Margin="0,0,0,6">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type vm:OrdersViewModel}}, x:DataType=vm:OrdersViewModel}" CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="100,110,90,*,160,50,90,90,90" ColumnSpacing="8">
+                            <Label Text="{Binding Date, StringFormat='{0:d}'}" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="{Binding OrderRef}" VerticalOptions="Center" />
+                            <Label Grid.Column="2" Text="{Binding Status, Converter={StaticResource Humanize}}" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                            <VerticalStackLayout Grid.Column="3" VerticalOptions="Center">
+                                <Label Text="{Binding PiecesText}" LineBreakMode="TailTruncation" />
+                                <Label Text="{Binding Customer}" Style="{StaticResource Muted}" IsVisible="{Binding Customer, Converter={StaticResource HasValue}}" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="4" Text="{Binding TrackingText}" VerticalOptions="Center" Style="{StaticResource Muted}" LineBreakMode="TailTruncation" />
+                            <Label Grid.Column="5" Text="{Binding Items}" HorizontalTextAlignment="End" VerticalOptions="Center" />
+                            <Label Grid.Column="6" Text="{Binding Revenue, StringFormat='{0:N2}'}" HorizontalTextAlignment="End" VerticalOptions="Center" />
+                            <Label Grid.Column="7" Text="{Binding CostAndFees, StringFormat='{0:N2}'}" HorizontalTextAlignment="End" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                            <Label Grid.Column="8" Text="{Binding Profit, StringFormat='{0:N2}'}" HorizontalTextAlignment="End" VerticalOptions="Center" FontAttributes="Bold" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>
