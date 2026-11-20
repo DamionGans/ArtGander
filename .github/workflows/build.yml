@@ -84,10 +84,12 @@ jobs:
   macos:
     needs: [version, test]
     runs-on: macos-26
+    # .NET 11 needs Xcode 27.2, which GitHub's macOS runners don't have yet. Until they do, a failing macOS
+    # build must not block the Windows installers or a release. Remove this line once the macOS job passes.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      # .NET for Mac Catalyst asks for the newest Xcode; until GitHub's runners have it, build with the newest
-      # installed one and skip the exact-version check (ValidateXcodeVersion=false below).
+      # .NET for Mac Catalyst needs a matching (usually the newest) Xcode: pick the newest one installed.
       - name: Select newest Xcode
         run: |
           ls -d /Applications/Xcode*.app
@@ -106,7 +108,6 @@ jobs:
           -c Release -f net11.0-maccatalyst
           -p:Version=${{ needs.version.outputs.version }}
           -p:ApplicationVersion=${{ github.run_number }}
-          -p:ValidateXcodeVersion=false
       - name: Build DMG
         env:
           MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
