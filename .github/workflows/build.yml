@@ -86,7 +86,9 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-      - name: Select newest Xcode (.NET for Mac Catalyst needs a matching Xcode)
+      # .NET for Mac Catalyst asks for the newest Xcode; until GitHub's runners have it, build with the newest
+      # installed one and skip the exact-version check (ValidateXcodeVersion=false below).
+      - name: Select newest Xcode
         run: |
           ls -d /Applications/Xcode*.app
           XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
@@ -104,6 +106,7 @@ jobs:
           -c Release -f net11.0-maccatalyst
           -p:Version=${{ needs.version.outputs.version }}
           -p:ApplicationVersion=${{ github.run_number }}
+          -p:ValidateXcodeVersion=false
       - name: Build DMG
         env:
           MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
