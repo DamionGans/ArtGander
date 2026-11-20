@@ -208,6 +208,8 @@ public sealed partial class OrderDetailViewModel(AppState app, ArtPieceStore sto
     }
 
     [RelayCommand]
+    private void RemoveItem(OrderItemRow? row) => Ui.Fire(() => RemoveItemAsync(row));
+
     private async Task RemoveItemAsync(OrderItemRow? row)
     {
         if (row is null) return;
@@ -228,6 +230,8 @@ public sealed partial class OrderDetailViewModel(AppState app, ArtPieceStore sto
     }
 
     [RelayCommand]
+    private void OpenPiece(OrderItemRow? row) => Ui.Fire(() => OpenPieceAsync(row));
+
     private Task OpenPieceAsync(OrderItemRow? row) =>
         row is null ? Task.CompletedTask : LibraryViewModel.OpenPieceAsync(row.FolderPath, "sales");
 

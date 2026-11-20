@@ -24,10 +24,21 @@ public partial class LibraryPage : ContentPage
         await _app.InitializeAsync();
     }
 
-    /// <summary>Keeps grid cards around 230 px wide whatever the window size.</summary>
+    private const double TileWidth = 220;
+
+    /// <summary>
+    /// Keeps the tiles around <see cref="TileWidth"/> wide whatever the window size. A new layout object is assigned
+    /// instead of changing Span, because a runtime Span change isn't reliably applied by every platform.
+    /// </summary>
     private void UpdateSpan()
     {
-        if (Grid.ItemsLayout is GridItemsLayout layout && Width > 0)
-            layout.Span = Math.Max(1, (int)((Width - 48) / 230));
+        if (Width <= 0) return;
+        var span = Math.Max(2, (int)((Width - 48) / TileWidth));
+        if (Grid.ItemsLayout is GridItemsLayout { Span: var current } && current == span) return;
+        Grid.ItemsLayout = new GridItemsLayout(span, ItemsLayoutOrientation.Vertical)
+        {
+            HorizontalItemSpacing = 14,
+            VerticalItemSpacing = 14,
+        };
     }
 }

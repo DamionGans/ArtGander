@@ -2,12 +2,12 @@
 
 *Artistic Goose On The Loose*: a desktop app for artists to manage their art pieces, all the files and edited versions of each piece, products (originals, self-printed copies, print-on-demand), prices, production costs, listings, sales and copyright.
 
-**Your art folder is the database.** Every art piece is a folder with neatly named files and one `artgander.json` with all its details:
+**Your art folder is the database.** Every art piece is a folder with neatly named files and one `.artgander.json` with all its details:
 
 ```
 Art/
   Goose On The Loose/
-    artgander.json
+    .artgander.json
     Goose_On_The_Loose-photo.jpg
     Goose_On_The_Loose-master.tif
     Goose_On_The_Loose-transparent.png

@@ -32,7 +32,7 @@ public sealed class PlatformServices : IPlatformServices
     {
         // Mac Catalyst has no direct NSWorkspace API, so open the folder itself (Finder opens it).
         var folder = Directory.Exists(path) ? path : Path.GetDirectoryName(path)!;
-        UIApplication.SharedApplication.OpenUrl(NSUrl.CreateFileUrl(folder, isDirectory: true), new UIApplicationOpenUrlOptions(), null);
+        UIApplication.SharedApplication.OpenUrl(new NSUrl(folder, true), new UIApplicationOpenUrlOptions(), null);
     }
 
     public Task<bool> CreateThumbnailAsync(string sourcePath, string targetPath, int size)
@@ -41,7 +41,7 @@ public sealed class PlatformServices : IPlatformServices
         try
         {
             var request = new QLThumbnailGenerationRequest(
-                NSUrl.CreateFileUrl(sourcePath, isDirectory: false),
+                new NSUrl(sourcePath, false),
                 new CoreGraphics.CGSize(size, size),
                 UIScreen.MainScreen.Scale,
                 QLThumbnailGenerationRequestRepresentationTypes.Thumbnail);

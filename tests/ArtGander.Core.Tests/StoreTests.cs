@@ -13,7 +13,7 @@ public class StoreTests
     {
         using var lib = new TempLibrary();
         var folder = lib.Folder("Goose");
-        File.WriteAllText(Path.Combine(folder, "artgander.json"), """
+        File.WriteAllText(Path.Combine(folder, ".artgander.json"), """
             {
               "schemaVersion": 1,
               "title": "Goose",
@@ -33,7 +33,7 @@ public class StoreTests
         Assert.True(doc.HasUnsavedChanges);
         store.Save(doc);
 
-        var json = File.ReadAllText(Path.Combine(folder, "artgander.json"));
+        var json = File.ReadAllText(Path.Combine(folder, ".artgander.json"));
         Assert.Contains("\"futureField\"", json);
         Assert.Contains("\"futureNested\"", json);
         Assert.Contains("\"printOnDemand\"", json);
@@ -73,7 +73,7 @@ public class StoreTests
     {
         using var lib = new TempLibrary();
         var folder = lib.Folder("Goose");
-        File.WriteAllText(Path.Combine(folder, "artgander.json"), """{ "schemaVersion": 1, "title": "Goose", "size": "30x40" }""");
+        File.WriteAllText(Path.Combine(folder, ".artgander.json"), """{ "schemaVersion": 1, "title": "Goose", "size": "30x40" }""");
 
         var store = new ArtPieceStore(new SchemaMigrator([new FakeV1ToV2()], targetVersion: 2));
         var doc = store.Load(folder);
@@ -83,7 +83,7 @@ public class StoreTests
         var saved = JsonNode.Parse(File.ReadAllText(doc.FilePath))!;
         Assert.Equal(2, saved["schemaVersion"]!.GetValue<int>());
         Assert.Null(saved["size"]);
-        Assert.True(File.Exists(Path.Combine(folder, "artgander.json.v1.bak")));
+        Assert.True(File.Exists(Path.Combine(folder, ".artgander.json.v1.bak")));
 
         // A second load finds nothing to upgrade.
         Assert.Null(store.Load(folder).UpgradedFromVersion);
@@ -95,7 +95,7 @@ public class StoreTests
         using var lib = new TempLibrary();
         var folder = lib.Folder("Goose");
         var original = """{ "schemaVersion": 99, "title": "Goose", "artwork": { "originalStatus": "teleported" } }""";
-        File.WriteAllText(Path.Combine(folder, "artgander.json"), original);
+        File.WriteAllText(Path.Combine(folder, ".artgander.json"), original);
 
         var store = new ArtPieceStore();
         var doc = store.Load(folder);
@@ -110,9 +110,49 @@ public class StoreTests
     {
         using var lib = new TempLibrary();
         var folder = lib.Folder("Broken");
-        File.WriteAllText(Path.Combine(folder, "artgander.json"), "{ \"title\": ");
+        File.WriteAllText(Path.Combine(folder, ".artgander.json"), "{ \"title\": ");
         var ex = Assert.Throws<ArtPieceFileException>(() => new ArtPieceStore().Load(folder));
         Assert.Contains("invalid JSON", ex.Message);
+    }
+
+    [Fact]
+    public void Details_file_is_hidden()
+    {
+        using var lib = new TempLibrary();
+        var store = new ArtPieceStore();
+        var doc = store.Create(lib.Folder("Goose"), new ArtPiece { Title = "Goose" });
+        doc.Piece.Notes = "saved again";
+        store.Save(doc);
+
+        Assert.Equal(".artgander.json", Path.GetFileName(doc.FilePath));
+        if (OperatingSystem.IsWindows())
+            Assert.True(File.GetAttributes(doc.FilePath).HasFlag(FileAttributes.Hidden));
+    }
+
+    [Fact]
+    public void Visible_details_file_from_early_builds_is_renamed_and_hidden()
+    {
+        using var lib = new TempLibrary();
+        var folder = lib.Folder("Goose");
+        File.WriteAllText(Path.Combine(folder, "artgander.json"), """{ "schemaVersion": 1, "title": "Goose" }""");
+        Assert.True(ArtPieceStore.HasPieceFile(folder));
+
+        var doc = new ArtPieceStore().Load(folder);
+
+        Assert.Equal("Goose", doc.Piece.Title);
+        Assert.False(File.Exists(Path.Combine(folder, "artgander.json")));
+        Assert.True(File.Exists(Path.Combine(folder, ".artgander.json")));
+        if (OperatingSystem.IsWindows())
+            Assert.True(File.GetAttributes(doc.FilePath).HasFlag(FileAttributes.Hidden));
+    }
+
+    [Fact]
+    public void Library_folder_is_hidden()
+    {
+        using var lib = new TempLibrary();
+        LibrarySettingsStore.Save(lib.Root, new LibrarySettings());
+        if (OperatingSystem.IsWindows())
+            Assert.True(File.GetAttributes(Path.Combine(lib.Root, ".artgander")).HasFlag(FileAttributes.Hidden));
     }
 
     [Fact]

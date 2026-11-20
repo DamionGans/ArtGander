@@ -122,6 +122,8 @@ public sealed partial class LibraryViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void Open(PieceItemViewModel? item) => Ui.Fire(() => OpenAsync(item));
+
     private async Task OpenAsync(PieceItemViewModel? item)
     {
         if (item is null) return;
@@ -129,13 +131,13 @@ public sealed partial class LibraryViewModel : ObservableObject
         {
             if (item.Folder.Error is { } error)
             {
-                await Dialogs.AlertAsync("Can't open this piece", $"{error}\n\nFix or remove artgander.json in:\n{item.Folder.FolderPath}");
+                await Dialogs.AlertAsync("Can't open this piece", $"{error}\n\nFix or remove the hidden .artgander.json file in:\n{item.Folder.FolderPath}");
                 return;
             }
             var files = item.Folder.UntrackedFiles.Count;
             var ok = await Dialogs.ConfirmAsync("Start tracking this folder?",
                 $"\"{item.Folder.FolderName}\" has no ArtGander details yet ({files} file{(files == 1 ? "" : "s")}). " +
-                "ArtGander will add an artgander.json file to it. Your files are not renamed or moved.", "Track folder");
+                "ArtGander will add a hidden .artgander.json details file to it. Your files are not renamed or moved.", "Track folder");
             if (!ok) return;
             try
             {
@@ -169,7 +171,7 @@ public sealed partial class PieceItemViewModel(PieceFolder folder, string curren
     {
         get
         {
-            if (Folder.Error is not null) return "Can't read artgander.json";
+            if (Folder.Error is not null) return "Can't read its details file";
             if (!Folder.IsAdopted) return "Not tracked yet: click to start";
             var p = Folder.Document!.Piece;
             var parts = new List<string>();

@@ -42,6 +42,7 @@ public static class OrderStore
     {
         var folder = FolderFor(rootPath);
         Directory.CreateDirectory(folder);
+        AtomicFile.MarkHidden(Path.GetDirectoryName(folder)!); // the .artgander folder
         order.UpdatedAt = DateTimeOffset.Now;
         order.UpdatedBy = Environment.MachineName;
         var fileName = FileNameFor(order);

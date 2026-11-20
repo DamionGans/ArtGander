@@ -17,7 +17,19 @@ public sealed class ArtPieceStore(SchemaMigrator migrator)
     public static string AppVersion { get; } =
         typeof(ArtPieceStore).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "dev";
 
-    public static bool HasPieceFile(string folderPath) => File.Exists(Path.Combine(folderPath, CurrentSchema.PieceFileName));
+    public static bool HasPieceFile(string folderPath) =>
+        File.Exists(Path.Combine(folderPath, CurrentSchema.PieceFileName))
+        || File.Exists(Path.Combine(folderPath, CurrentSchema.LegacyPieceFileName));
+
+    /// <summary>Renames a visible details file from early builds to the hidden name.</summary>
+    private static void PromoteLegacyFile(string folderPath)
+    {
+        var legacy = Path.Combine(folderPath, CurrentSchema.LegacyPieceFileName);
+        var current = Path.Combine(folderPath, CurrentSchema.PieceFileName);
+        if (!File.Exists(legacy) || File.Exists(current)) return;
+        try { File.Move(legacy, current); }
+        catch (IOException) { /* another computer may be doing the same right now */ }
+    }
 
     /// <summary>
     /// Loads a piece. Files with an older schema are upgraded in place (a <c>.v{N}.bak</c> backup is kept).
@@ -26,6 +38,7 @@ public sealed class ArtPieceStore(SchemaMigrator migrator)
     /// <exception cref="ArtPieceFileException">The file is missing or isn't valid JSON.</exception>
     public ArtPieceDocument Load(string folderPath)
     {
+        PromoteLegacyFile(folderPath);
         var path = Path.Combine(folderPath, CurrentSchema.PieceFileName);
         byte[] bytes;
         try { bytes = AtomicFile.ReadAllBytes(path); }
@@ -34,6 +47,7 @@ public sealed class ArtPieceStore(SchemaMigrator migrator)
             throw new ArtPieceFileException(path, $"Could not read {CurrentSchema.PieceFileName}: {ex.Message}", ex);
         }
 
+        AtomicFile.MarkHidden(path);
         var hash = AtomicFile.Hash(bytes);
         var text = AtomicFile.DecodeUtf8(bytes);
 

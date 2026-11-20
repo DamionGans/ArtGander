@@ -1,4 +1,6 @@
-# Art folder and `artgander.json` format
+# Art folder and `.artgander.json` format
+
+ArtGander's own files are **hidden**: `.artgander.json` in every piece folder, its upgrade backups, and the `.artgander` library folder. The leading dot hides them on macOS and Linux, and ArtGander sets the Hidden attribute on Windows (again on every load, because a Mac rewriting the file over the network can drop it). Visible `artgander.json` files from early builds are renamed and hidden automatically. To look at them, enable hidden files in Explorer (View → Show → Hidden items) or Finder (⌘⇧.).
 
 ArtGander treats **the file system as the source of truth**. There is no central database. Everything about an art piece lives in its own folder, so the library can be read, backed up, synced and fixed with ordinary file tools.
 
@@ -11,8 +13,8 @@ ArtGander treats **the file system as the source of truth**. There is no central
     orders/
       1001.json                          order details: payment, tax, production bill, shipping, tracking
   Goose On The Loose/                    one folder per art piece (the folder name comes from the title)
-    artgander.json                       all details about this piece
-    artgander.json.v1.bak                backup made automatically when the file format was upgraded
+    .artgander.json                       all details about this piece
+    .artgander.json.v1.bak                backup made automatically when the file format was upgraded
     Goose_On_The_Loose-photo.jpg         {Art_Piece_Name}-{version}.{ext}
     Goose_On_The_Loose-master.tif
     Goose_On_The_Loose-transparent.png
@@ -34,14 +36,14 @@ Name comparisons ignore case and Unicode normalization, because Windows and most
 
 ### How the file system leads
 
-* Every subfolder of the art folder is an art piece. Folders without `artgander.json` show up as "not tracked yet", and one click adds the file. Existing files are never renamed without asking.
-* Files present on disk but missing from `artgander.json` show up as **new files** to track (and optionally rename).
-* Entries in `artgander.json` whose file is gone are flagged as **missing**.
+* Every subfolder of the art folder is an art piece. Folders without `.artgander.json` show up as "not tracked yet", and one click adds the file. Existing files are never renamed without asking.
+* Files present on disk but missing from `.artgander.json` show up as **new files** to track (and optionally rename).
+* Entries in `.artgander.json` whose file is gone are flagged as **missing**.
 * Tracked files that don't follow the naming convention are flagged with a **Fix name** button.
 * Renaming a piece renames its folder, every file that follows the convention, and every product link, all as one operation with rollback.
 * Thumbnails are cached in the app's local cache folder, never inside the art folder.
 
-## `artgander.json`
+## `.artgander.json`
 
 UTF-8 without BOM, LF line endings, 2-space indentation, camelCase property names, enum values as camelCase strings. Unknown properties are preserved, so an older ArtGander never deletes data that a newer one wrote.
 
@@ -126,14 +128,14 @@ Profit per order = (amount paid − tax in it) − (production + production tax)
 
 ## Working from several computers
 
-* Every save first writes a temporary file in the same folder and then renames it over `artgander.json`, which is atomic on NTFS, APFS and SMB. No file locks are held.
+* Every save first writes a temporary file in the same folder and then renames it over `.artgander.json`, which is atomic on NTFS, APFS and SMB. No file locks are held.
 * Before saving, ArtGander checks whether the file changed since it was opened (by hash). If another computer changed it, you choose between **Load their version** and **Keep mine**. An open piece with no local edits reloads automatically.
 * Only per-computer items live outside the art folder: which art folder this computer opens, the thumbnail cache, and the crash log.
 * The library view refreshes through file-system notifications plus periodic polling, because notifications don't work reliably for changes made by another computer on a network share.
 
 ## Format versions and automatic upgrades
 
-`schemaVersion` records the structure version of each file. When ArtGander opens a file with an older version, it runs the migration steps in `src/ArtGander.Core/Schema/Migrations` one at a time, keeps a backup as `artgander.json.v{old}.bak`, and writes the upgraded file. A file written by a **newer** ArtGander opens read-only with a message to update the app, so nothing is lost when one computer is updated before the other.
+`schemaVersion` records the structure version of each file. When ArtGander opens a file with an older version, it runs the migration steps in `src/ArtGander.Core/Schema/Migrations` one at a time, keeps a backup as `.artgander.json.v{old}.bak`, and writes the upgraded file. A file written by a **newer** ArtGander opens read-only with a message to update the app, so nothing is lost when one computer is updated before the other.
 
 | Version | Changes |
 |---|---|

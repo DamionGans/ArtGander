@@ -79,6 +79,8 @@ public sealed partial class OrdersViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void Open(OrderSummary? order) => Ui.Fire(() => OpenAsync(order));
+
     private Task OpenAsync(OrderSummary? order)
     {
         if (order is null) return Task.CompletedTask;

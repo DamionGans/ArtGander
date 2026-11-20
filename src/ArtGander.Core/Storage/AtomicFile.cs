@@ -26,6 +26,7 @@ public static class AtomicFile
                 fs.Flush(flushToDisk: true);
             }
             File.Move(tmp, path, overwrite: true);
+            if (Path.GetFileName(path).StartsWith('.')) MarkHidden(path);
         }
         finally
         {
@@ -56,6 +57,21 @@ public static class AtomicFile
 
     public static string DecodeUtf8(byte[] bytes) =>
         bytes.AsSpan().StartsWith((ReadOnlySpan<byte>)[0xEF, 0xBB, 0xBF]) ? Utf8NoBom.GetString(bytes, 3, bytes.Length - 3) : Utf8NoBom.GetString(bytes);
+
+    /// <summary>
+    /// Hides a file or folder whose name starts with a dot. macOS and Linux already hide such names; Windows needs
+    /// the Hidden attribute. Rewriting a file from a Mac can drop that attribute, so ArtGander calls this again on load.
+    /// </summary>
+    public static void MarkHidden(string path)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        try
+        {
+            var attributes = File.GetAttributes(path);
+            if (!attributes.HasFlag(FileAttributes.Hidden)) File.SetAttributes(path, attributes | FileAttributes.Hidden);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* cosmetic only */ }
+    }
 
     internal static void TryDelete(string path)
     {

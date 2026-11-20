@@ -17,7 +17,7 @@ public class LibraryTests
         var doc = Service.CreatePiece(lib.Root, "Goose: On The Loose", new LibrarySettings { DefaultCopyrightOwner = "Goose Studio" });
 
         Assert.Equal(Path.Combine(lib.Root, "Goose On The Loose"), doc.FolderPath);
-        Assert.True(File.Exists(Path.Combine(doc.FolderPath, "artgander.json")));
+        Assert.True(File.Exists(Path.Combine(doc.FolderPath, ".artgander.json")));
         Assert.Equal("Goose Studio", doc.Piece.Copyright.Owner);
         Assert.Throws<IOException>(() => Service.CreatePiece(lib.Root, "Goose On The Loose"));
     }
@@ -96,6 +96,22 @@ public class LibraryTests
     }
 
     [Fact]
+    public void Copies_with_numbered_suffix_get_unique_convention_names()
+    {
+        using var lib = new TempLibrary();
+        lib.WriteFile("Goose/Goose (2).png");
+        lib.WriteFile("Goose/sketch (2).png");
+        lib.WriteFile("Goose/sketch-2.png");
+        var doc = Service.AdoptFolder(Path.Combine(lib.Root, "Goose"));
+
+        foreach (var entry in doc.Piece.Files.ToList()) Service.ApplyConvention(doc, entry);
+
+        var names = Directory.GetFiles(doc.FolderPath, "*.png").Select(Path.GetFileName).Order().ToList();
+        Assert.Equal(["Goose-2.png", "Goose-sketch-2-2.png", "Goose-sketch-2.png"], names);
+        Assert.All(doc.Piece.Files, f => Assert.True(File.Exists(Path.Combine(doc.FolderPath, f.FileName))));
+    }
+
+    [Fact]
     public void Renaming_a_piece_renames_folder_files_and_links()
     {
         using var lib = new TempLibrary();
@@ -136,7 +152,7 @@ public class LibraryTests
         Service.CreatePiece(lib.Root, "Swan");
         Assert.Throws<IOException>(() => Service.RenamePiece(doc, "Swan"));
         Assert.Equal("Goose", doc.Piece.Title);
-        Assert.True(File.Exists(Path.Combine(lib.Root, "Goose", "artgander.json")));
+        Assert.True(File.Exists(Path.Combine(lib.Root, "Goose", ".artgander.json")));
     }
 
     [Fact]

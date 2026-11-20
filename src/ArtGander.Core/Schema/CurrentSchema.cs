@@ -15,10 +15,16 @@ public static class CurrentSchema
 {
     public const int Version = 1;
 
-    /// <summary>The name of the details file inside every art piece folder.</summary>
-    public const string PieceFileName = "artgander.json";
+    /// <summary>
+    /// The name of the details file inside every art piece folder. The leading dot hides it on macOS/Linux,
+    /// and ArtGander sets the Hidden attribute on Windows, so the art folders show only the art.
+    /// </summary>
+    public const string PieceFileName = ".artgander.json";
 
-    /// <summary>The hidden library-level folder (shared settings only).</summary>
+    /// <summary>The visible name used by the first builds. Found files are renamed to <see cref="PieceFileName"/> and hidden.</summary>
+    public const string LegacyPieceFileName = "artgander.json";
+
+    /// <summary>The hidden library-level folder (shared settings and order details).</summary>
     public const string LibraryFolderName = ".artgander";
 
     public const string LibraryFileName = "library.json";

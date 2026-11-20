@@ -35,8 +35,8 @@ public sealed class PieceFolder
     /// <summary>Files ArtGander never treats as art files.</summary>
     public static bool IsIgnoredFile(string fileName) =>
         fileName.StartsWith('.')
-        || NameRules.NamesEqual(fileName, CurrentSchema.PieceFileName)
-        || fileName.StartsWith(CurrentSchema.PieceFileName + ".", StringComparison.OrdinalIgnoreCase) // backups
+        || NameRules.NamesEqual(fileName, CurrentSchema.LegacyPieceFileName)
+        || fileName.StartsWith(CurrentSchema.LegacyPieceFileName + ".", StringComparison.OrdinalIgnoreCase) // old backups
         || NameRules.NamesEqual(fileName, "Thumbs.db")
         || NameRules.NamesEqual(fileName, "desktop.ini")
         || fileName.StartsWith("~$", StringComparison.Ordinal)

@@ -75,6 +75,8 @@ public sealed partial class CollectionsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void Rename(CollectionRow? row) => Ui.Fire(() => RenameAsync(row));
+
     private async Task RenameAsync(CollectionRow? row)
     {
         if (row is null) return;
@@ -88,6 +90,8 @@ public sealed partial class CollectionsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void Delete(CollectionRow? row) => Ui.Fire(() => DeleteAsync(row));
+
     private async Task DeleteAsync(CollectionRow? row)
     {
         if (row is null) return;
@@ -101,6 +105,8 @@ public sealed partial class CollectionsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void Show(CollectionRow? row) => Ui.Fire(() => ShowAsync(row));
+
     private async Task ShowAsync(CollectionRow? row)
     {
         if (row is null) return;

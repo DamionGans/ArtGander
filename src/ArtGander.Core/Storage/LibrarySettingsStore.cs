@@ -28,6 +28,7 @@ public static class LibrarySettingsStore
     {
         var path = PathFor(rootPath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        AtomicFile.MarkHidden(Path.GetDirectoryName(path)!);
         AtomicFile.WriteAllText(path, ArtGanderJson.Serialize(settings));
     }
 }

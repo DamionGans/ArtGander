@@ -98,7 +98,7 @@ public sealed partial class PieceDetailViewModel(
             var doc = store.Load(folderPath);
             Bind(doc);
             if (doc.UpgradedFromVersion is { } v)
-                Notice = $"This piece's details file was upgraded from format version {v}. A backup was kept as artgander.json.v{v}.bak.";
+                Notice = $"This piece's details file was upgraded from format version {v}. A backup was kept as .artgander.json.v{v}.bak.";
         }
         catch (Exception ex)
         {
@@ -355,6 +355,8 @@ public sealed partial class PieceDetailViewModel(
     }
 
     [RelayCommand]
+    private void OpenFile(FileRowViewModel? row) => Ui.Fire(() => OpenFileAsync(row));
+
     private async Task OpenFileAsync(FileRowViewModel? row)
     {
         if (row is null || row.IsMissing) return;
@@ -369,14 +371,20 @@ public sealed partial class PieceDetailViewModel(
     }
 
     [RelayCommand]
+    private void RenameVersion(FileRowViewModel? row) => Ui.Fire(() => RenameVersionAsync(row));
+
     private Task RenameVersionAsync(FileRowViewModel? row) =>
         row is null || !row.VersionChanged ? Task.CompletedTask : FileOpAsync(() => pieces.ChangeFileVersion(Doc!, row.Entry, row.EditVersion));
 
     [RelayCommand]
+    private void ApplyConvention(FileRowViewModel? row) => Ui.Fire(() => ApplyConventionAsync(row));
+
     private Task ApplyConventionAsync(FileRowViewModel? row) =>
         row is null ? Task.CompletedTask : FileOpAsync(() => pieces.ApplyConvention(Doc!, row.Entry));
 
     [RelayCommand]
+    private void UntrackFile(FileRowViewModel? row) => Ui.Fire(() => UntrackFileAsync(row));
+
     private async Task UntrackFileAsync(FileRowViewModel? row)
     {
         if (row is null) return;
@@ -389,10 +397,14 @@ public sealed partial class PieceDetailViewModel(
     }
 
     [RelayCommand]
+    private void TrackFile(UntrackedFileViewModel? file) => Ui.Fire(() => TrackFileAsync(file));
+
     private Task TrackFileAsync(UntrackedFileViewModel? file) =>
         file is null ? Task.CompletedTask : FileOpAsync(() => pieces.TrackFile(Doc!, file.FileName, file.Version, file.Kind, renameToConvention: true));
 
     [RelayCommand]
+    private void TrackFileAsIs(UntrackedFileViewModel? file) => Ui.Fire(() => TrackFileAsIsAsync(file));
+
     private Task TrackFileAsIsAsync(UntrackedFileViewModel? file) =>
         file is null ? Task.CompletedTask : FileOpAsync(() => pieces.TrackFile(Doc!, file.FileName, file.Version, file.Kind, renameToConvention: false));
 
@@ -408,6 +420,8 @@ public sealed partial class PieceDetailViewModel(
     }
 
     [RelayCommand]
+    private void RemoveProduct(ProductViewModel? vm) => Ui.Fire(() => RemoveProductAsync(vm));
+
     private async Task RemoveProductAsync(ProductViewModel? vm)
     {
         if (vm is null || Piece is null) return;
@@ -446,6 +460,8 @@ public sealed partial class PieceDetailViewModel(
     }
 
     [RelayCommand]
+    private void OpenUrl(string? url) => Ui.Fire(() => OpenUrlAsync(url));
+
     private async Task OpenUrlAsync(string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return;
@@ -474,6 +490,8 @@ public sealed partial class PieceDetailViewModel(
     }
 
     [RelayCommand]
+    private void RemoveSale(SaleViewModel? vm) => Ui.Fire(() => RemoveSaleAsync(vm));
+
     private async Task RemoveSaleAsync(SaleViewModel? vm)
     {
         if (vm is null || Piece is null) return;
