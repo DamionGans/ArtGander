@@ -21,6 +21,7 @@
             <conv:InverseBoolConverter x:Key="Not" />
             <conv:SelectLabelConverter x:Key="SelectLabel" />
             <conv:CheckMarkConverter x:Key="CheckMark" />
+            <conv:SortArrowConverter x:Key="SortArrow" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -67,4 +67,15 @@
         <Setter Property="BackgroundColor" Value="{StaticResource Pond}" />
         <Setter Property="TextColor" Value="White" />
     </Style>
+
+    <!-- Column headers in tables: click to sort -->
+    <Style x:Key="HeaderButton" TargetType="Button">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="HorizontalOptions" Value="Start" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource MutedLight}, Dark={StaticResource MutedDark}}" />
+    </Style>
 </ResourceDictionary>

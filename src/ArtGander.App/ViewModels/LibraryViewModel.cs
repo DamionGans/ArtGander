@@ -17,7 +17,11 @@ public sealed partial class LibraryViewModel : ObservableObject
 {
     public const string AllCollections = "All collections";
     public static IReadOnlyList<string> TypeFilters { get; } = (string[])["Pieces & projects", "Art pieces", "Projects"];
-    public static IReadOnlyList<string> TileShapes { get; } = (string[])["Portrait (3:4)", "Square", "Landscape (4:3)"];
+    public static IReadOnlyList<string> ViewModes { get; } = (string[])["Raster", "Large rows", "Details"];
+    public const string AnyStatus = "Any status";
+    public static IReadOnlyList<string> StatusFilters { get; } =
+        [AnyStatus, "Not tracked", .. Enum.GetValues<WorkStatus>().Select(s => Converters.HumanizeConverter.Humanize(s.ToString()))];
+    public static IReadOnlyList<string> SortOptions { get; } = (string[])["Title", "Type", "Status", "Collections", "Files", "Products", "Sold", "Created", "Changed"];
 
     private readonly AppState _app;
     private readonly PieceService _pieces;
@@ -65,27 +69,122 @@ public sealed partial class LibraryViewModel : ObservableObject
         SelectedCollection = collection;
     }
 
-    // ---- Tile shape --------------------------------------------------------------------------------
+    // ---- Views: raster, large rows, details -----------------------------------------------------------
 
-    /// <summary>The shape of the library tiles; remembered on this computer.</summary>
-    [ObservableProperty] public partial string TileShape { get; set; } = Preferences.Default.Get("tileShape", TileShapes[0]);
+    /// <summary>How the library is shown; remembered on this computer.</summary>
+    [ObservableProperty] public partial string ViewMode { get; set; } = Preferences.Default.Get("libraryView", "Raster");
+    [ObservableProperty] public partial string StatusFilter { get; set; } = AnyStatus;
+    [ObservableProperty] public partial string SortBy { get; set; } = Preferences.Default.Get("librarySort", "Title");
+    [ObservableProperty] public partial bool SortDescending { get; set; } = Preferences.Default.Get("librarySortDesc", false);
 
-    /// <summary>Tile width, set by the page whenever the window resizes.</summary>
-    [ObservableProperty] public partial double TileWidth { get; set; } = 220;
+    /// <summary>The raster's row height (the "zoom"); remembered on this computer.</summary>
+    [ObservableProperty] public partial double RasterHeight { get; set; } = Preferences.Default.Get("rasterHeight", 200.0);
 
-    public double TileHeight => Math.Round(TileWidth * TileShape switch
+    /// <summary>The width the raster can use, set by the page whenever the window resizes.</summary>
+    [ObservableProperty] public partial double AvailableWidth { get; set; }
+
+    public bool IsRaster => ViewMode == ViewModes[0];
+    public bool IsRows => ViewMode == ViewModes[1];
+    public bool IsDetails => ViewMode == ViewModes[2];
+
+    public ObservableCollection<RasterRow> RasterRows { get; } = [];
+
+    public const double RasterSpacing = 8;
+    private IDispatcherTimer? _relayoutTimer;
+
+    partial void OnViewModeChanged(string value)
     {
-        "Square" => 1.0,
-        "Landscape (4:3)" => 0.75,
-        _ => 4.0 / 3.0,
-    });
+        Preferences.Default.Set("libraryView", value);
+        OnPropertyChanged(nameof(IsRaster));
+        OnPropertyChanged(nameof(IsRows));
+        OnPropertyChanged(nameof(IsDetails));
+        RelayoutRaster();
+    }
 
-    partial void OnTileWidthChanged(double value) => OnPropertyChanged(nameof(TileHeight));
+    partial void OnStatusFilterChanged(string value) => ApplyFilter();
 
-    partial void OnTileShapeChanged(string value)
+    partial void OnSortByChanged(string value)
     {
-        Preferences.Default.Set("tileShape", value);
-        OnPropertyChanged(nameof(TileHeight));
+        Preferences.Default.Set("librarySort", value);
+        ApplyFilter();
+        OnPropertyChanged(nameof(SortIndicator));
+    }
+
+    partial void OnSortDescendingChanged(bool value)
+    {
+        Preferences.Default.Set("librarySortDesc", value);
+        ApplyFilter();
+        OnPropertyChanged(nameof(SortIndicator));
+    }
+
+    partial void OnRasterHeightChanged(double value)
+    {
+        Preferences.Default.Set("rasterHeight", value);
+        ScheduleRelayout();
+    }
+
+    partial void OnAvailableWidthChanged(double value) => ScheduleRelayout();
+
+    /// <summary>"Title ▲" etc., for the details table header.</summary>
+    public string SortIndicator => SortBy + (SortDescending ? " ▼" : " ▲");
+
+    /// <summary>Clicking a column header sorts by it; clicking it again reverses the order.</summary>
+    [RelayCommand]
+    private void SortColumn(string column)
+    {
+        if (SortBy == column) SortDescending = !SortDescending;
+        else { SortDescending = column is "Sold" or "Products" or "Files" or "Created" or "Changed"; SortBy = column; }
+    }
+
+    [RelayCommand]
+    private void ToggleSortDirection() => SortDescending = !SortDescending;
+
+    [RelayCommand]
+    private void SetViewMode(string mode) => ViewMode = mode;
+
+    private IEnumerable<PieceItemViewModel> Sort(IEnumerable<PieceItemViewModel> items)
+    {
+        var natural = NameRules.NaturalComparer;
+        IOrderedEnumerable<PieceItemViewModel> sorted = SortBy switch
+        {
+            "Type" => items.OrderBy(i => i.TypeText),
+            "Status" => items.OrderBy(i => i.StatusOrder),
+            "Collections" => items.OrderBy(i => i.CollectionsText.Length == 0).ThenBy(i => i.CollectionsText, StringComparer.CurrentCultureIgnoreCase),
+            "Files" => items.OrderBy(i => i.FileCount),
+            "Products" => items.OrderBy(i => i.Stats.Products),
+            "Sold" => items.OrderBy(i => i.Stats.Sold),
+            "Created" => items.OrderBy(i => i.Created ?? DateOnly.MinValue),
+            "Changed" => items.OrderBy(i => i.Changed ?? DateTimeOffset.MinValue),
+            _ => items.OrderBy(i => i.Title, natural),
+        };
+        var list = sorted.ThenBy(i => i.Title, natural).ToList();
+        if (SortDescending) list.Reverse();
+        return list;
+    }
+
+    private void ScheduleRelayout()
+    {
+        if (Application.Current?.Dispatcher is not { } dispatcher) { RelayoutRaster(); return; }
+        _relayoutTimer ??= dispatcher.CreateTimer();
+        _relayoutTimer.Interval = TimeSpan.FromMilliseconds(120);
+        _relayoutTimer.IsRepeating = false;
+        _relayoutTimer.Tick -= OnRelayoutTick;
+        _relayoutTimer.Tick += OnRelayoutTick;
+        _relayoutTimer.Stop();
+        _relayoutTimer.Start();
+    }
+
+    private void OnRelayoutTick(object? sender, EventArgs e) => RelayoutRaster();
+
+    /// <summary>Packs the visible items into rows that fill the width, each tile in its image's own shape.</summary>
+    private void RelayoutRaster()
+    {
+        if (!IsRaster || AvailableWidth <= 0) { RasterRows.Clear(); return; }
+        var items = Items.ToList();
+        var rows = JustifiedLayout.Rows(items.Select(i => i.Aspect).ToList(), AvailableWidth, RasterHeight, RasterSpacing);
+        RasterRows.Clear();
+        foreach (var row in rows)
+            RasterRows.Add(new RasterRow(row.Select(c => new RasterCell(items[c.Index], c.Width, c.Height)).ToList()));
     }
 
     // ---- Building the grid -------------------------------------------------------------------------
@@ -109,9 +208,10 @@ public sealed partial class LibraryViewModel : ObservableObject
             if (previous.TryGetValue(p.FolderPath, out var prev))
             {
                 vm.IsSelected = prev.IsSelected; // keep the selection across refreshes
-                if (prev.PreviewSource == p.PreviewFilePath) vm.Thumbnail = prev.Thumbnail;
+                if (prev.PreviewSource == p.PreviewFilePath) { vm.Thumbnail = prev.Thumbnail; vm.Aspect = prev.Aspect; }
             }
             if (vm.Thumbnail is null) _ = vm.LoadThumbnailAsync(_thumbs);
+            vm.AspectChanged += (_, _) => { if (IsRaster) ScheduleRelayout(); };
             return vm;
         }).ToList();
 
@@ -141,10 +241,12 @@ public sealed partial class LibraryViewModel : ObservableObject
             && (query.Length == 0 || i.Matches(query))
             && (TypeFilter == TypeFilters[0] || (TypeFilter == TypeFilters[2]) == i.Folder.IsProject)
             && (SelectedCollection == AllCollections || i.InCollection(SelectedCollection))
+            && (StatusFilter == AnyStatus || i.StatusFilterText == StatusFilter)
             && (!AttentionOnly || i.NeedsAttention));
 
         Items.Clear();
-        foreach (var item in filtered) Items.Add(item);
+        foreach (var item in Sort(filtered)) Items.Add(item);
+        RelayoutRaster();
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(NoMatches));
     }
@@ -419,6 +521,25 @@ public sealed partial class PieceItemViewModel(PieceFolder folder, PieceStats? s
 {
     public PieceFolder Folder { get; } = folder;
     public PieceStats Stats { get; } = stats ?? PieceStats.Empty;
+
+    /// <summary>The preview's width divided by its height; 0 until the thumbnail is loaded.</summary>
+    public double Aspect { get; set; }
+    public event EventHandler? AspectChanged;
+
+    public string TypeText => !Folder.IsAdopted ? "Folder" : Folder.IsProject ? "Project" : "Art piece";
+    public string WorkStatusText => Folder.Document?.Piece is { } p ? Converters.HumanizeConverter.Humanize(p.Status.ToString()) : "Not tracked";
+    public string StatusFilterText => WorkStatusText;
+    public int StatusOrder => Folder.Document?.Piece is { } p ? (int)p.Status : -1;
+    public string CollectionsText => Folder.Document?.Piece is { } p ? string.Join(", ", p.Collections) : "";
+    public int FileCount => Folder.Document?.Piece.Files.Count ?? Folder.UntrackedFiles.Count;
+    public string FilesText => Folder.IsProject ? $"{Folder.Children.Count} pieces" : FileCount.ToString();
+    public string ProductsText => Stats.Products > 0 ? Stats.Products.ToString() : "";
+    public string SoldText => Stats.Sold > 0 ? Stats.Sold.ToString() : "";
+    public DateOnly? Created => Folder.Document?.Piece.CreatedOn;
+    public DateTimeOffset? Changed => Folder.Document?.Piece.UpdatedAt;
+    public string CreatedText => Created?.ToString("d") ?? "";
+    public string ChangedText => Changed?.ToString("d") ?? "";
+    public string Description => Folder.Document?.Piece.Description is { Length: > 0 } d ? d.ReplaceLineEndings(" ") : "";
     public string Title => Folder.Parent is null ? Folder.Title : Folder.DisplayPath;
     public string? PreviewSource => Folder.PreviewFilePath;
     public bool IsProject => Folder.IsProject;
@@ -502,6 +623,25 @@ public sealed partial class PieceItemViewModel(PieceFolder folder, PieceStats? s
     public async Task LoadThumbnailAsync(ThumbnailService thumbs)
     {
         var path = await thumbs.GetAsync(PreviewSource);
-        if (path is not null) MainThread.BeginInvokeOnMainThread(() => Thumbnail = ImageSource.FromFile(path));
+        if (path is null) return;
+        var size = await Task.Run(() => ImageHeader.TryGetSize(path));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            Thumbnail = ImageSource.FromFile(path);
+            if (size is { } sz)
+            {
+                Aspect = (double)sz.Width / sz.Height;
+                AspectChanged?.Invoke(this, EventArgs.Empty);
+            }
+        });
     }
+}
+
+/// <summary>One tile in the raster view, sized to its image's shape.</summary>
+public sealed record RasterCell(PieceItemViewModel Item, double Width, double Height);
+
+/// <summary>One row of the raster view.</summary>
+public sealed record RasterRow(IReadOnlyList<RasterCell> Cells)
+{
+    public double Height => Cells.Count == 0 ? 0 : Cells[0].Height;
 }

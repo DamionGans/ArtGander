@@ -15,7 +15,7 @@ public partial class LibraryPage : ContentPage
         InitializeComponent();
         BindingContext = _vm = viewModel;
         _app = app;
-        SizeChanged += (_, _) => UpdateSpan();
+        SizeChanged += (_, _) => UpdateAvailableWidth();
     }
 
     protected override async void OnAppearing()
@@ -26,24 +26,11 @@ public partial class LibraryPage : ContentPage
         await _app.InitializeAsync();
     }
 
-    private const double TileWidth = 220;
-
-    /// <summary>
-    /// Keeps the tiles around <see cref="TileWidth"/> wide whatever the window size. A new layout object is assigned
-    /// instead of changing Span, because a runtime Span change isn't reliably applied by every platform.
-    /// </summary>
-    private void UpdateSpan()
+    /// <summary>Tells the raster view how much width its rows can fill.</summary>
+    private void UpdateAvailableWidth()
     {
         if (Width <= 0) return;
-        const double spacing = 14, padding = 48, scrollbar = 16;
-        var available = Width - padding - scrollbar;
-        var span = Math.Max(2, (int)((available + spacing) / (TileWidth + spacing)));
-        _vm.TileWidth = Math.Floor((available - spacing * (span - 1)) / span); // height follows the chosen shape
-        if (Grid.ItemsLayout is GridItemsLayout { Span: var current } && current == span) return;
-        Grid.ItemsLayout = new GridItemsLayout(span, ItemsLayoutOrientation.Vertical)
-        {
-            HorizontalItemSpacing = 14,
-            VerticalItemSpacing = 14,
-        };
+        const double padding = 48, scrollbar = 18;
+        _vm.AvailableWidth = Math.Floor(Width - padding - scrollbar);
     }
 }

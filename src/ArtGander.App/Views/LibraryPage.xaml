@@ -39,16 +39,47 @@
             </HorizontalStackLayout>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="*,170,200,150,Auto" ColumnSpacing="12" IsVisible="{Binding HasRoot}">
-            <SearchBar Placeholder="Search titles, descriptions, tags, products… (also inside projects)" Text="{Binding SearchText}" />
-            <Picker Grid.Column="1" ItemsSource="{x:Static vm:LibraryViewModel.TypeFilters}" SelectedItem="{Binding TypeFilter}" />
-            <Picker Grid.Column="2" ItemsSource="{Binding CollectionFilters}" SelectedItem="{Binding SelectedCollection}" />
-            <Picker Grid.Column="3" ItemsSource="{x:Static vm:LibraryViewModel.TileShapes}" SelectedItem="{Binding TileShape}" />
-            <HorizontalStackLayout Grid.Column="4" Spacing="4" VerticalOptions="Center">
-                <CheckBox IsChecked="{Binding AttentionOnly}" VerticalOptions="Center" />
-                <Label Text="Needs attention" VerticalOptions="Center" />
+        <VerticalStackLayout Grid.Row="1" Spacing="8" IsVisible="{Binding HasRoot}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <SearchBar Placeholder="Search titles, descriptions, tags, products… (also inside projects)" Text="{Binding SearchText}" />
+                <!-- View switch: raster / large rows / details -->
+                <HorizontalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                    <Button Text="Raster" Command="{Binding SetViewModeCommand}" CommandParameter="Raster">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding IsRaster}" Value="True"><Setter Property="BackgroundColor" Value="{StaticResource Pond}" /><Setter Property="TextColor" Value="White" /></DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                    <Button Text="Large rows" Command="{Binding SetViewModeCommand}" CommandParameter="Large rows">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding IsRows}" Value="True"><Setter Property="BackgroundColor" Value="{StaticResource Pond}" /><Setter Property="TextColor" Value="White" /></DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                    <Button Text="Details" Command="{Binding SetViewModeCommand}" CommandParameter="Details">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding IsDetails}" Value="True"><Setter Property="BackgroundColor" Value="{StaticResource Pond}" /><Setter Property="TextColor" Value="White" /></DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                </HorizontalStackLayout>
+            </Grid>
+            <HorizontalStackLayout Spacing="14">
+                <Picker WidthRequest="160" ItemsSource="{x:Static vm:LibraryViewModel.TypeFilters}" SelectedItem="{Binding TypeFilter}" />
+                <Picker WidthRequest="180" ItemsSource="{Binding CollectionFilters}" SelectedItem="{Binding SelectedCollection}" />
+                <Picker WidthRequest="140" ItemsSource="{x:Static vm:LibraryViewModel.StatusFilters}" SelectedItem="{Binding StatusFilter}" />
+                <HorizontalStackLayout Spacing="4">
+                    <Label Text="Sort" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                    <Picker WidthRequest="130" ItemsSource="{x:Static vm:LibraryViewModel.SortOptions}" SelectedItem="{Binding SortBy}" />
+                    <Button Text="{Binding SortDescending, Converter={StaticResource SortArrow}}" Command="{Binding ToggleSortDirectionCommand}" Padding="10,4" />
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="4">
+                    <CheckBox IsChecked="{Binding AttentionOnly}" VerticalOptions="Center" />
+                    <Label Text="Needs attention" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="6" IsVisible="{Binding IsRaster}">
+                    <Label Text="Size" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                    <Slider WidthRequest="140" Minimum="100" Maximum="400" Value="{Binding RasterHeight}" VerticalOptions="Center" />
+                </HorizontalStackLayout>
             </HorizontalStackLayout>
-        </Grid>
+        </VerticalStackLayout>
 
         <!-- Selection actions -->
         <Border Grid.Row="2" Style="{StaticResource Card}" Padding="12,8" IsVisible="{Binding IsSelecting}">
@@ -84,63 +115,143 @@
 
             <Label IsVisible="{Binding NoMatches}" Text="Nothing matches your filters." Style="{StaticResource Muted}" HorizontalOptions="Center" Margin="0,40" />
 
-            <CollectionView x:Name="Grid" ItemsSource="{Binding Items}" SelectionMode="None">
-                <CollectionView.ItemsLayout>
-                    <GridItemsLayout Orientation="Vertical" Span="5" HorizontalItemSpacing="14" VerticalItemSpacing="14" />
-                </CollectionView.ItemsLayout>
+            <!-- ============ RASTER: rows that fill the width, every image in its own shape ============ -->
+            <CollectionView ItemsSource="{Binding RasterRows}" SelectionMode="None" IsVisible="{Binding IsRaster}">
+                <CollectionView.Footer>
+                    <BoxView HeightRequest="24" Color="Transparent" />
+                </CollectionView.Footer>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:RasterRow">
+                        <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Cells}" Spacing="8" Margin="0,0,0,8" HeightRequest="{Binding Height}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RasterCell">
+                                    <Border WidthRequest="{Binding Width}" HeightRequest="{Binding Height}" Style="{StaticResource Thumb}" StrokeShape="RoundRectangle 6" StrokeThickness="0">
+                                        <Border.Triggers>
+                                            <DataTrigger TargetType="Border" Binding="{Binding Item.IsSelected}" Value="True">
+                                                <Setter Property="Stroke" Value="{StaticResource Beak}" />
+                                                <Setter Property="StrokeThickness" Value="4" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, x:DataType=vm:LibraryViewModel}"
+                                                                  CommandParameter="{Binding Item}" />
+                                        </Border.GestureRecognizers>
+                                        <Grid>
+                                            <Image Source="placeholder.png" Aspect="AspectFit" Opacity="0.5" Margin="24" />
+                                            <Image Source="{Binding Item.Thumbnail}" Aspect="AspectFill" />
+                                            <Border IsVisible="{Binding Item.IsSelecting}" BackgroundColor="#B0000000" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                                    HorizontalOptions="Start" VerticalOptions="Start" Margin="6" Padding="4,0" InputTransparent="True">
+                                                <Label Text="{Binding Item.IsSelected, Converter={StaticResource CheckMark}}" TextColor="White" FontSize="16" />
+                                            </Border>
+                                            <Border IsVisible="{Binding Item.AttentionText, Converter={StaticResource HasValue}}" BackgroundColor="#E0B7791F" StrokeThickness="0"
+                                                    StrokeShape="RoundRectangle 10" HorizontalOptions="End" VerticalOptions="Start" Margin="6" Padding="6,1" InputTransparent="True">
+                                                <Label Text="⚠" TextColor="White" FontSize="11" />
+                                            </Border>
+                                            <!-- Title on a soft band, like image search results -->
+                                            <Grid VerticalOptions="End" BackgroundColor="#A0000000" Padding="8,4" RowDefinitions="Auto,Auto" InputTransparent="True">
+                                                <Label Text="{Binding Item.Badge}" TextColor="{StaticResource Beak}" FontSize="9" FontAttributes="Bold" IsVisible="{Binding Item.Badge, Converter={StaticResource HasValue}}" />
+                                                <Label Grid.Row="1" Text="{Binding Item.Title}" TextColor="White" FontSize="12" LineBreakMode="TailTruncation" />
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </HorizontalStackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- ============ LARGE ROWS: a fixed-width list, the whole preview visible ============ -->
+            <CollectionView ItemsSource="{Binding Items}" SelectionMode="None" IsVisible="{Binding IsRows}">
                 <CollectionView.Footer>
                     <BoxView HeightRequest="24" Color="Transparent" />
                 </CollectionView.Footer>
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="vm:PieceItemViewModel">
-                        <!-- A tile in the chosen shape: the artwork fills it, the title sits on a dark band at the bottom.
-                             Projects look like a small stack of cards. -->
-                        <Grid HeightRequest="{Binding TileHeight, Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, x:DataType=vm:LibraryViewModel}">
-                        <Border Style="{StaticResource Thumb}" StrokeShape="RoundRectangle 8" IsVisible="{Binding IsProject}" Margin="10,0,0,10" Opacity="0.45" InputTransparent="True" />
-                        <Border Style="{StaticResource Thumb}" StrokeShape="RoundRectangle 8" IsVisible="{Binding IsProject}" Margin="5,5,5,5" Opacity="0.7" InputTransparent="True" />
-                        <Border Style="{StaticResource Thumb}" StrokeShape="RoundRectangle 8" StrokeThickness="0">
+                        <Border Style="{StaticResource Card}" Padding="10" Margin="0,0,0,8" WidthRequest="900" HorizontalOptions="Start">
                             <Border.Triggers>
-                                <DataTrigger TargetType="Border" Binding="{Binding IsProject}" Value="True">
-                                    <Setter Property="Margin" Value="0,10,10,0" />
-                                </DataTrigger>
                                 <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
                                     <Setter Property="Stroke" Value="{StaticResource Beak}" />
-                                    <Setter Property="StrokeThickness" Value="4" />
+                                    <Setter Property="StrokeThickness" Value="3" />
                                 </DataTrigger>
                             </Border.Triggers>
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, x:DataType=vm:LibraryViewModel}"
                                                       CommandParameter="{Binding .}" />
                             </Border.GestureRecognizers>
-                            <Grid>
-                                <Image Source="placeholder.png" Aspect="AspectFit" Opacity="0.5" Margin="48" />
-                                <Image Source="{Binding Thumbnail}" Aspect="AspectFill" />
-
-                                <!-- Selection check -->
-                                <Border IsVisible="{Binding IsSelecting}" BackgroundColor="#B0000000" StrokeThickness="0" StrokeShape="RoundRectangle 6"
-                                        HorizontalOptions="Start" VerticalOptions="Start" Margin="8" Padding="4,0" InputTransparent="True">
-                                    <Label Text="{Binding IsSelected, Converter={StaticResource CheckMark}}" TextColor="White" FontSize="18" />
+                            <Grid ColumnDefinitions="Auto,160,*,Auto" ColumnSpacing="16">
+                                <Label Text="{Binding IsSelected, Converter={StaticResource CheckMark}}" IsVisible="{Binding IsSelecting}" FontSize="18" VerticalOptions="Center" />
+                                <!-- A fixed box: the preview is shown whole (fit), never stretched or cropped -->
+                                <Border Grid.Column="1" Style="{StaticResource Thumb}" WidthRequest="160" HeightRequest="160">
+                                    <Grid>
+                                        <Image Source="placeholder.png" Opacity="0.5" Margin="36" />
+                                        <Image Source="{Binding Thumbnail}" Aspect="AspectFit" />
+                                    </Grid>
                                 </Border>
-
-                                <!-- Attention badge -->
-                                <Border IsVisible="{Binding AttentionText, Converter={StaticResource HasValue}}" BackgroundColor="#E0B7791F" StrokeThickness="0"
-                                        StrokeShape="RoundRectangle 10" HorizontalOptions="End" VerticalOptions="Start" Margin="8" Padding="8,2" InputTransparent="True">
-                                    <Label Text="{Binding AttentionText}" TextColor="White" FontSize="11" />
-                                </Border>
-
-                                <!-- Title band -->
-                                <Grid VerticalOptions="End" BackgroundColor="#B8000000" Padding="10,6" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" InputTransparent="True">
-                                    <Label Text="{Binding Badge}" TextColor="{StaticResource Beak}" FontSize="10" FontAttributes="Bold" IsVisible="{Binding Badge, Converter={StaticResource HasValue}}" />
-                                    <Label Grid.Row="1" Text="{Binding Title}" TextColor="White" FontAttributes="Bold" LineBreakMode="TailTruncation" />
-                                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding StatusText}" TextColor="#DDDDDD" FontSize="11" VerticalOptions="Center" />
-                                    <Label Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Subtitle}" TextColor="#DDDDDD" FontSize="11" LineBreakMode="TailTruncation" />
-                                </Grid>
+                                <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center">
+                                    <Label Text="{Binding Badge}" TextColor="{StaticResource Beak}" FontSize="11" FontAttributes="Bold" IsVisible="{Binding Badge, Converter={StaticResource HasValue}}" />
+                                    <Label Text="{Binding Title}" FontSize="18" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" />
+                                    <Label Text="{Binding Description}" MaxLines="3" LineBreakMode="TailTruncation" IsVisible="{Binding Description, Converter={StaticResource HasValue}}" />
+                                    <Label Text="{Binding AttentionText}" Style="{StaticResource WarningText}" IsVisible="{Binding AttentionText, Converter={StaticResource HasValue}}" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="3" Text="{Binding StatusText}" VerticalOptions="Center" FontAttributes="Bold" />
                             </Grid>
                         </Border>
-                        </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+
+            <!-- ============ DETAILS: a sortable table ============ -->
+            <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsDetails}">
+                <Grid ColumnDefinitions="28,48,3*,100,110,2*,70,80,60,95,95" ColumnSpacing="8" Padding="8,4">
+                    <Button Grid.Column="2" Text="Title" Command="{Binding SortColumnCommand}" CommandParameter="Title" Style="{StaticResource HeaderButton}" />
+                    <Button Grid.Column="3" Text="Type" Command="{Binding SortColumnCommand}" CommandParameter="Type" Style="{StaticResource HeaderButton}" />
+                    <Button Grid.Column="4" Text="Status" Command="{Binding SortColumnCommand}" CommandParameter="Status" Style="{StaticResource HeaderButton}" />
+                    <Button Grid.Column="5" Text="Collections" Command="{Binding SortColumnCommand}" CommandParameter="Collections" Style="{StaticResource HeaderButton}" />
+                    <Button Grid.Column="6" Text="Files" Command="{Binding SortColumnCommand}" CommandParameter="Files" Style="{StaticResource HeaderButton}" />
+                    <Button Grid.Column="7" Text="Products" Command="{Binding SortColumnCommand}" CommandParameter="Products" Style="{StaticResource HeaderButton}" />
+                    <Button Grid.Column="8" Text="Sold" Command="{Binding SortColumnCommand}" CommandParameter="Sold" Style="{StaticResource HeaderButton}" />
+                    <Button Grid.Column="9" Text="Created" Command="{Binding SortColumnCommand}" CommandParameter="Created" Style="{StaticResource HeaderButton}" />
+                    <Button Grid.Column="10" Text="Changed" Command="{Binding SortColumnCommand}" CommandParameter="Changed" Style="{StaticResource HeaderButton}" />
+                </Grid>
+                <CollectionView Grid.Row="1" ItemsSource="{Binding Items}" SelectionMode="None">
+                    <CollectionView.Footer>
+                        <BoxView HeightRequest="24" Color="Transparent" />
+                    </CollectionView.Footer>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PieceItemViewModel">
+                            <Grid ColumnDefinitions="28,48,3*,100,110,2*,70,80,60,95,95" ColumnSpacing="8" Padding="8,3">
+                                <Grid.Triggers>
+                                    <DataTrigger TargetType="Grid" Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="#33F29A2E" />
+                                    </DataTrigger>
+                                </Grid.Triggers>
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, x:DataType=vm:LibraryViewModel}"
+                                                          CommandParameter="{Binding .}" />
+                                </Grid.GestureRecognizers>
+                                <Label Text="{Binding IsSelected, Converter={StaticResource CheckMark}}" IsVisible="{Binding IsSelecting}" VerticalOptions="Center" />
+                                <Border Grid.Column="1" Style="{StaticResource Thumb}" WidthRequest="44" HeightRequest="44" StrokeShape="RoundRectangle 4">
+                                    <Image Source="{Binding Thumbnail}" Aspect="AspectFit" />
+                                </Border>
+                                <VerticalStackLayout Grid.Column="2" VerticalOptions="Center">
+                                    <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding AttentionText}" Style="{StaticResource WarningText}" FontSize="11" IsVisible="{Binding AttentionText, Converter={StaticResource HasValue}}" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="3" Text="{Binding TypeText}" VerticalOptions="Center" />
+                                <Label Grid.Column="4" Text="{Binding WorkStatusText}" VerticalOptions="Center" />
+                                <Label Grid.Column="5" Text="{Binding CollectionsText}" VerticalOptions="Center" LineBreakMode="TailTruncation" Style="{StaticResource Muted}" />
+                                <Label Grid.Column="6" Text="{Binding FilesText}" VerticalOptions="Center" HorizontalTextAlignment="End" />
+                                <Label Grid.Column="7" Text="{Binding ProductsText}" VerticalOptions="Center" HorizontalTextAlignment="End" />
+                                <Label Grid.Column="8" Text="{Binding SoldText}" VerticalOptions="Center" HorizontalTextAlignment="End" />
+                                <Label Grid.Column="9" Text="{Binding CreatedText}" VerticalOptions="Center" HorizontalTextAlignment="End" Style="{StaticResource Muted}" />
+                                <Label Grid.Column="10" Text="{Binding ChangedText}" VerticalOptions="Center" HorizontalTextAlignment="End" Style="{StaticResource Muted}" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
         </Grid>
     </Grid>
 </ContentPage>
