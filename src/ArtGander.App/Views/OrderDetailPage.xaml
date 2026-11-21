@@ -121,7 +121,7 @@
 
             <!-- Items -->
             <Label Text="Items" Style="{StaticResource SectionTitle}" />
-            <Label Text="Each item is stored as a sale on its art piece. An order can contain items from several pieces." Style="{StaticResource Muted}" />
+            <Label Text="Each item is stored as a sale on its art piece or project. Order a whole project through one of the project's products (e.g. the printed book or a set of prints), or any single piece inside it." Style="{StaticResource Muted}" />
             <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="6" Margin="0,6">
                 <BindableLayout.EmptyView>
                     <Label Text="No items yet." Style="{StaticResource Muted}" />
@@ -146,9 +146,9 @@
             <Border Style="{StaticResource Card}">
                 <Grid ColumnDefinitions="2*,2*,80,100,Auto" ColumnSpacing="10">
                     <VerticalStackLayout>
-                        <Label Text="Art piece" Style="{StaticResource FieldLabel}" />
+                        <Label Text="Art piece or project" Style="{StaticResource FieldLabel}" />
                         <Picker ItemsSource="{Binding Pieces}" SelectedItem="{Binding NewItemPiece}"
-                                ItemDisplayBinding="{Binding Piece.Title, x:DataType=st:ArtPieceDocument}" />
+                                ItemDisplayBinding="{Binding DisplayTitle, x:DataType=st:ArtPieceDocument}" />
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1">
                         <Label Text="Product" Style="{StaticResource FieldLabel}" />

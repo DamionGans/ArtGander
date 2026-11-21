@@ -7,12 +7,14 @@ namespace ArtGander.Core.Services;
 public sealed record SaleRow(
     ArtPieceDocument Piece,
     Sale Sale,
-    Product? Product)
+    Product? Product,
+    decimal? BundleUnitCost = null)
 {
-    public string PieceTitle => Piece.Piece.Title;
+    /// <summary>The piece or project title; pieces inside a project read "Project › Piece".</summary>
+    public string PieceTitle => Piece.DisplayTitle;
     public string ProductName => Product?.Name ?? "(unknown product)";
     public decimal Revenue => Sale.UnitPrice * Sale.Quantity;
-    public decimal Cost => (Sale.UnitCost ?? Product?.ProductionCost ?? 0m) * Sale.Quantity;
+    public decimal Cost => (Sale.UnitCost ?? Product?.ProductionCost ?? BundleUnitCost ?? 0m) * Sale.Quantity;
     public decimal Profit => Revenue - Cost - Sale.Fees;
 }
 
@@ -55,10 +57,38 @@ public static class SalesReport
 {
     private const string NoRef = "\0no-ref:";
 
-    public static IReadOnlyList<SaleRow> Rows(IEnumerable<ArtPieceDocument> docs) =>
-        docs.SelectMany(d => d.Piece.Sales.Select(s => new SaleRow(d, s, d.Piece.FindProduct(s.ProductId))))
+    public static IReadOnlyList<SaleRow> Rows(IEnumerable<ArtPieceDocument> docs)
+    {
+        var all = docs.ToList();
+        var byId = PieceLookup(all.Select(d => d.Piece));
+        return all.SelectMany(d => d.Piece.Sales.Select(s =>
+            {
+                var product = d.Piece.FindProduct(s.ProductId);
+                return new SaleRow(d, s, product, product is null ? null : BundleCost(product, byId));
+            }))
             .OrderByDescending(r => r.Sale.Date)
             .ToList();
+    }
+
+    public static IReadOnlyDictionary<Guid, ArtPiece> PieceLookup(IEnumerable<ArtPiece> pieces) =>
+        pieces.GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
+
+    /// <summary>
+    /// The production cost of a bundle product (e.g. "Set of 3 prints"): the sum of the included pieces' product
+    /// costs times their quantity. Null when the product isn't a bundle.
+    /// </summary>
+    public static decimal? BundleCost(Product product, IReadOnlyDictionary<Guid, ArtPiece> piecesById)
+    {
+        if (product.Includes.Count == 0) return null;
+        decimal total = 0;
+        foreach (var item in product.Includes)
+        {
+            if (!piecesById.TryGetValue(item.PieceId, out var piece)) continue;
+            var cost = piece.FindProduct(item.ProductId)?.ProductionCost ?? 0;
+            total += cost * Math.Max(1, item.Quantity);
+        }
+        return total;
+    }
 
     /// <summary>
     /// Groups sale lines into orders and attaches order details by reference. Lines without an order reference

@@ -4,7 +4,9 @@ using ArtGander.Core.Storage;
 
 namespace ArtGander.Core.Library;
 
-/// <summary>Reads the whole art folder: each subfolder is one art piece.</summary>
+/// <summary>
+/// Reads the whole art folder. Each subfolder is an art piece or a project; a project's subfolders are its pieces.
+/// </summary>
 public sealed class LibraryScanner(ArtPieceStore store)
 {
     public ArtPieceStore Store => store;
@@ -17,23 +19,52 @@ public sealed class LibraryScanner(ArtPieceStore store)
         var results = new PieceFolder[folders.Count];
         // Network shares have high latency per file, so reading folders in parallel pays off a lot.
         Parallel.For(0, folders.Count, new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = 8 },
-            i => results[i] = ScanFolder(folders[i]));
-        return results.OrderBy(p => p.Title, NameRules.Comparer).ToList();
+            i => results[i] = ScanFolder(folders[i], ct));
+        return results.OrderBy(p => p.Title, NameRules.NaturalComparer).ToList();
     }
 
-    public PieceFolder ScanFolder(string folderPath)
+    /// <summary>Scans a top-level folder: a piece, or a project together with its pieces.</summary>
+    public PieceFolder ScanFolder(string folderPath, CancellationToken ct = default)
+    {
+        var folder = ScanSingle(folderPath, classify: true);
+        if (folder is { IsProject: true, IsAdopted: true }) ScanChildren(folder, ct);
+        return folder;
+    }
+
+    private PieceFolder ScanSingle(string folderPath, bool classify)
     {
         if (!ArtPieceStore.HasPieceFile(folderPath))
-            return PieceFolder.From(folderPath, null);
+            return PieceFolder.From(folderPath, null, classify: classify);
         try
         {
-            return PieceFolder.From(folderPath, store.Load(folderPath));
+            return PieceFolder.From(folderPath, store.Load(folderPath), classify: classify);
         }
         catch (ArtPieceFileException ex)
         {
-            return PieceFolder.From(folderPath, null, ex.Message);
+            return PieceFolder.From(folderPath, null, ex.Message, classify: classify);
         }
     }
+
+    private void ScanChildren(PieceFolder project, CancellationToken ct)
+    {
+        var dirs = EnumeratePieceFolders(project.FolderPath).ToList();
+        var children = new PieceFolder[dirs.Count];
+        Parallel.For(0, dirs.Count, new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = 4 },
+            i => children[i] = ScanSingle(dirs[i], classify: false));
+        foreach (var c in children)
+        {
+            c.Parent = project;
+            if (c.Document is not null) c.Document.ProjectTitle = project.Title;
+        }
+        project.Children = OrderChildren(project.Document!.Piece.PieceOrder, children);
+    }
+
+    /// <summary>Orders a project's pieces: first as listed in pieceOrder, then the rest by title.</summary>
+    public static IReadOnlyList<PieceFolder> OrderChildren(IList<Guid> order, IEnumerable<PieceFolder> children) =>
+        children
+            .OrderBy(c => c.Document is { } d && order.IndexOf(d.Piece.Id) is var i and >= 0 ? i : int.MaxValue)
+            .ThenBy(c => c.Title, NameRules.NaturalComparer)
+            .ToList();
 
     public static IEnumerable<string> EnumeratePieceFolders(string rootPath)
     {
@@ -56,10 +87,12 @@ public sealed class LibraryScanner(ArtPieceStore store)
     /// A cheap fingerprint of the library state (folder names plus metadata timestamps and sizes).
     /// Comparing fingerprints detects changes from other computers on shares where file-change notifications don't work.
     /// </summary>
-    public static string Fingerprint(string rootPath)
+    public static string Fingerprint(string rootPath, IEnumerable<string>? projectFolders = null)
     {
         var hash = new HashCode();
-        foreach (var dir in EnumeratePieceFolders(rootPath).Order(StringComparer.Ordinal))
+        var dirs = EnumeratePieceFolders(rootPath)
+            .Concat((projectFolders ?? []).Where(Directory.Exists).SelectMany(EnumeratePieceFolders));
+        foreach (var dir in dirs.Order(StringComparer.Ordinal))
         {
             hash.Add(dir, StringComparer.Ordinal);
             try

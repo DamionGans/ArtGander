@@ -54,7 +54,7 @@ public partial class PieceDetailPage : ContentPage
     {
         var selected = (Style)Application.Current!.Resources["TabButtonSelected"];
         var normal = (Style)Application.Current.Resources["TabButton"];
-        foreach (var (button, tab) in new[] { (TabOverview, "overview"), (TabFiles, "files"), (TabProducts, "products"), (TabSales, "sales"), (TabCopyright, "copyright") })
+        foreach (var (button, tab) in new[] { (TabOverview, "overview"), (TabPieces, "pieces"), (TabFiles, "files"), (TabProducts, "products"), (TabSales, "sales"), (TabCopyright, "copyright") })
             button.Style = ViewModel.Tab == tab ? selected : normal;
     }
 

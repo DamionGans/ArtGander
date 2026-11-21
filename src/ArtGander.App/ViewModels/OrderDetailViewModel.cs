@@ -64,7 +64,7 @@ public sealed partial class OrderDetailViewModel(AppState app, ArtPieceStore sto
         Order.PropertyChanged += (_, _) => UpdateSummary();
 
         Pieces.Clear();
-        foreach (var d in app.Documents.Where(d => !d.IsReadOnly).OrderBy(d => d.Piece.Title, StringComparer.CurrentCultureIgnoreCase)) Pieces.Add(d);
+        foreach (var d in app.Documents.Where(d => !d.IsReadOnly).OrderBy(d => d.DisplayTitle, NameRules.NaturalComparer)) Pieces.Add(d);
         RebuildItems();
     }
 
@@ -261,7 +261,7 @@ public sealed partial class OrderDetailViewModel(AppState app, ArtPieceStore sto
     {
         var selected = NewItemPiece?.FolderPath;
         Pieces.Clear();
-        foreach (var d in app.Documents.Where(d => !d.IsReadOnly).OrderBy(d => d.Piece.Title, StringComparer.CurrentCultureIgnoreCase)) Pieces.Add(d);
+        foreach (var d in app.Documents.Where(d => !d.IsReadOnly).OrderBy(d => d.DisplayTitle, NameRules.NaturalComparer)) Pieces.Add(d);
         NewItemPiece = Pieces.FirstOrDefault(p => p.FolderPath == selected);
     }
 }

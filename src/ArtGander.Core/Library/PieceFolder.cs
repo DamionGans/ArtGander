@@ -6,8 +6,9 @@ using ArtGander.Core.Storage;
 namespace ArtGander.Core.Library;
 
 /// <summary>
-/// One folder in the art library, as found on disk. The filesystem is the source of truth:
-/// what <c>artgander.json</c> says gets reconciled against the files that actually exist.
+/// One folder in the art library, as found on disk: an art piece or a project. The filesystem is the source of truth:
+/// what <c>.artgander.json</c> says gets reconciled against the files that actually exist.
+/// Projects contain their art pieces as subfolders (<see cref="Children"/>).
 /// </summary>
 public sealed class PieceFolder
 {
@@ -27,8 +28,30 @@ public sealed class PieceFolder
     /// <summary>Tracked files whose names don't follow the <c>{Art_Piece_Name}-{version}.{ext}</c> convention.</summary>
     public IReadOnlyList<string> MisnamedFiles { get; init; } = [];
 
+    /// <summary>For untracked folders: what the folder looks like (see <see cref="FolderClassifier"/>).</summary>
+    public ItemType SuggestedType { get; init; } = ItemType.Piece;
+
+    /// <summary>The number of art subfolders found (untracked project candidates, or a piece that grew subfolders).</summary>
+    public int ArtSubfolderCount { get; init; }
+
+    /// <summary>The project this piece belongs to, or null for a stand-alone piece or a project.</summary>
+    public PieceFolder? Parent { get; internal set; }
+
+    /// <summary>A project's art pieces, in the project's order.</summary>
+    public IReadOnlyList<PieceFolder> Children { get; internal set; } = [];
+
+    public ItemType Type => Document?.Piece.Type ?? SuggestedType;
+    public bool IsProject => Type == ItemType.Project;
+
+    /// <summary>A tracked art piece that contains several art subfolders and probably should be a project.</summary>
+    public bool LooksLikeProject => IsAdopted && !IsProject && Parent is null && ArtSubfolderCount >= FolderClassifier.MinimumProjectPieces;
+
     public bool IsAdopted => Document is not null;
-    public bool NeedsAttention => !IsAdopted || Error is not null || UntrackedFiles.Count > 0 || MissingFiles.Count > 0 || MisnamedFiles.Count > 0;
+    public bool NeedsAttention => !IsAdopted || Error is not null || UntrackedFiles.Count > 0 || MissingFiles.Count > 0 || MisnamedFiles.Count > 0
+                                  || LooksLikeProject || Children.Any(c => c.NeedsAttention);
+
+    /// <summary>"Project > Piece" for pieces inside a project, otherwise the title.</summary>
+    public string DisplayPath => Parent is null ? Title : Parent.Title + " › " + Title;
 
     public string Title => Document?.Piece.Title is { Length: > 0 } t ? t : FolderName;
 
@@ -60,11 +83,22 @@ public sealed class PieceFolder
     }
 
     /// <summary>Reconciles a loaded document with the folder contents.</summary>
-    public static PieceFolder From(string folderPath, ArtPieceDocument? doc, string? error = null)
+    public static PieceFolder From(string folderPath, ArtPieceDocument? doc, string? error = null, bool classify = true)
     {
         var onDisk = ListArtFiles(folderPath);
+        // Projects can't be nested, so only top-level folders are checked for art subfolders.
+        var artSubfolders = classify ? FolderClassifier.ArtSubfolders(folderPath).Count : 0;
         if (doc is null)
-            return new PieceFolder { FolderPath = folderPath, Error = error, UntrackedFiles = onDisk };
+        {
+            return new PieceFolder
+            {
+                FolderPath = folderPath,
+                Error = error,
+                UntrackedFiles = onDisk,
+                ArtSubfolderCount = artSubfolders,
+                SuggestedType = artSubfolders >= FolderClassifier.MinimumProjectPieces ? ItemType.Project : ItemType.Piece,
+            };
+        }
 
         var diskSet = new HashSet<string>(onDisk, NameRules.Comparer);
         var tracked = new HashSet<string>(doc.Piece.Files.Select(f => f.FileName), NameRules.Comparer);
@@ -73,6 +107,7 @@ public sealed class PieceFolder
             FolderPath = folderPath,
             Document = doc,
             Error = error,
+            ArtSubfolderCount = artSubfolders,
             UntrackedFiles = onDisk.Where(f => !tracked.Contains(f)).ToList(),
             MissingFiles = doc.Piece.Files.Select(f => f.FileName).Where(f => !diskSet.Contains(f)).ToList(),
             MisnamedFiles = doc.Piece.Files.Select(f => f.FileName)
@@ -90,18 +125,26 @@ public sealed class PieceFolder
         return i < 0 ? PreviewPreference.Length : i;
     }
 
-    /// <summary>Picks the best file to show as the piece's thumbnail.</summary>
+    /// <summary>
+    /// Picks the best file to show as the thumbnail. For a project: a "cover" file if there is one, then its own
+    /// images, then the first piece's preview.
+    /// </summary>
     public string? PreviewFilePath
     {
         get
         {
-            var candidates = Document?.Piece.Files
+            var images = Document?.Piece.Files
                 .Where(f => PreviewExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant()) && !MissingFiles.Contains(f.FileName))
-                .OrderBy(f => PreviewRank(f.Kind))
+                .OrderBy(f => IsCover(f) ? -1 : PreviewRank(f.Kind))
                 .Select(f => f.FileName)
-                ?? UntrackedFiles.Where(f => PreviewExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
-            var first = candidates.FirstOrDefault();
-            return first is null ? null : Path.Combine(FolderPath, first);
+                .ToList()
+                ?? UntrackedFiles.Where(f => PreviewExtensions.Contains(Path.GetExtension(f).ToLowerInvariant())).ToList();
+            var first = images.FirstOrDefault();
+            if (first is not null) return Path.Combine(FolderPath, first);
+            return Children.Select(c => c.PreviewFilePath).FirstOrDefault(p => p is not null);
         }
     }
+
+    private static bool IsCover(FileEntry f) =>
+        NameRules.NamesEqual(f.Kind, "cover") || f.Version.Contains("cover", StringComparison.OrdinalIgnoreCase);
 }

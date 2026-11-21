@@ -30,6 +30,10 @@ public static class NameRules
 
     public static StringComparer Comparer { get; } = new NormalizedComparer();
 
+    /// <summary>Sorts like people expect: "Page 2" before "Page 10", ignoring case.</summary>
+    public static StringComparer NaturalComparer { get; } =
+        StringComparer.Create(System.Globalization.CultureInfo.InvariantCulture, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.NumericOrdering);
+
     /// <summary>Turns an art piece title into a valid folder name, e.g. <c>"Goose: On the Loose?"</c> becomes <c>"Goose On the Loose"</c>.</summary>
     public static string ToFolderName(string title)
     {

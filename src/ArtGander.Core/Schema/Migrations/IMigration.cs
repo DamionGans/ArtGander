@@ -18,6 +18,6 @@ public static class MigrationCatalog
 {
     public static IReadOnlyList<IMigration> All { get; } =
     [
-        // Example for the future:  new V1ToV2_SplitDimensions(),
+        new V1ToV2_ItemType(),
     ];
 }

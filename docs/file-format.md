@@ -43,13 +43,48 @@ Name comparisons ignore case and Unicode normalization, because Windows and most
 * Renaming a piece renames its folder, every file that follows the convention, and every product link, all as one operation with rollback.
 * Thumbnails are cached in the app's local cache folder, never inside the art folder.
 
+## Art pieces and projects
+
+The library holds two kinds of items, and the `type` in `.artgander.json` says which one a folder is:
+
+* **Art piece** (`"type": "piece"`): one artwork with its files: photo, master, transparent version, prints…
+* **Project** (`"type": "project"`): work that belongs together, such as the illustrations for a book. A project folder contains
+  project-only files (book text, description, cover…) under the same naming convention, plus **one subfolder per art piece**:
+
+```
+Art/
+  The Goose Book/
+    .artgander.json                    { "type": "project", "pieceOrder": [ids…] }
+    The_Goose_Book-book-text.docx
+    The_Goose_Book-cover.png           a "cover" file becomes the project's thumbnail
+    Goose Wakes Up/
+      .artgander.json                  { "type": "piece" }
+      Goose_Wakes_Up-master.tif
+    Page 12/                           a planned piece: no files yet, status "planned"
+      .artgander.json
+```
+
+* A piece belongs to at most one project. Projects can't be nested. Subfolders inside a *piece* (e.g. `exports/`) are ignored.
+* `pieceOrder` stores the pieces' order (e.g. the page order of a book) by piece id, so renaming a folder doesn't break it.
+  Pieces that aren't listed come after, in natural order ("Page 2" before "Page 10").
+* **Collections** are about selling and presenting; **projects** are about the work itself. Both pieces and projects can be in collections.
+
+### Smart defaults when you start tracking a folder
+
+* A folder with **at least two subfolders that contain art** (images, psd, kra, procreate…, or tracked pieces) is suggested as a **project**.
+  Its art subfolders are tracked as its pieces.
+* Any other folder is suggested as an **art piece**.
+* You can always choose the other option. A tracked art piece that later gets several art subfolders shows **Convert to project**.
+
 ## `.artgander.json`
 
 UTF-8 without BOM, LF line endings, 2-space indentation, camelCase property names, enum values as camelCase strings. Unknown properties are preserved, so an older ArtGander never deletes data that a newer one wrote.
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "type": "piece",                      // piece | project
+  "status": "finished",                 // idea | planned | inProgress | finished | published
   "id": "b766106e-…",                   // stable identity; survives renames
   "title": "Goose On The Loose",
   "description": "",
@@ -83,6 +118,7 @@ UTF-8 without BOM, LF line endings, 2-space indentation, camelCase property name
       "costBreakdown": [{ "label": "paper", "amount": 1.2 }],
       "editionSize": null, "stock": 10,
       "listings": [{ "channel": "shopify", "url": "", "externalId": "", "price": 25, "status": "active" }],
+      "includes": [],                    // project bundles: [{ "pieceId": "…", "productId": "…", "quantity": 1 }]
       "notes": "" }
   ],
   "sales": [
@@ -91,9 +127,16 @@ UTF-8 without BOM, LF line endings, 2-space indentation, camelCase property name
       "unitCost": null,                  // null = use the product's production cost
       "currency": "EUR", "customer": "", "notes": "" }
   ],
-  "notes": ""
+  "notes": "",
+  "pieceOrder": []                       // projects only: piece ids in order
 }
 ```
+
+**Bundle products** (projects only), such as a "Set of 3 prints", list the pieces they include. When a bundle has no production cost of its own,
+its cost is the sum of the included pieces' product costs.
+
+**Ordering a project or a piece:** order the whole project through one of the project's products (the printed book, a print set),
+or any single piece inside it through that piece's products. Sale lines are stored with whichever item owns the product.
 
 Orders that include several pieces are stored as one sale line per piece, all sharing the same `orderRef`. The Orders screen groups them back together.
 
@@ -140,5 +183,6 @@ Profit per order = (amount paid − tax in it) − (production + production tax)
 | Version | Changes |
 |---|---|
 | 1 | First format. |
+| 2 | Projects: `type` (piece/project), `status`, `pieceOrder`, bundle `includes`. Upgrading sets `"type": "piece"` and `"status": "finished"`. ArtGander 0.1 opens version-2 files read-only, so update every computer. |
 
 To change the format: bump `CurrentSchema.Version`, add an `IMigration` with `FromVersion` = the previous version, register it in `MigrationCatalog.All`, and add a row to this table.

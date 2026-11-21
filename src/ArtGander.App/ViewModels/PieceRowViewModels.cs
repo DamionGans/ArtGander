@@ -97,6 +97,17 @@ public sealed partial class ProductViewModel : ObservableObject
     public Product Product { get; }
     public ObservableCollection<ProductFileLink> FileLinks { get; } = [];
 
+    /// <summary>Project products: which of the project's pieces this bundle includes.</summary>
+    public ObservableCollection<BundleLink> BundleLinks { get; } = [];
+    public bool IsBundleCapable => BundleLinks.Count > 0;
+
+    public void RebuildBundle(IEnumerable<Core.Library.PieceFolder> projectPieces)
+    {
+        BundleLinks.Clear();
+        foreach (var piece in projectPieces.Where(p => p.Document is not null)) BundleLinks.Add(new BundleLink(Product, piece));
+        OnPropertyChanged(nameof(IsBundleCapable));
+    }
+
     /// <summary>Linked file names that no longer exist in the piece.</summary>
     [ObservableProperty] public partial string MissingLinksText { get; set; } = "";
 

@@ -84,6 +84,7 @@ public sealed partial class PieceDetailViewModel(
         OnPropertyChanged(nameof(IsProducts));
         OnPropertyChanged(nameof(IsSales));
         OnPropertyChanged(nameof(IsCopyright));
+        OnPropertyChanged(nameof(IsPieces));
     }
 
     partial void OnEditTitleChanged(string value)
@@ -105,7 +106,7 @@ public sealed partial class PieceDetailViewModel(
             var doc = store.Load(folderPath);
             Bind(doc);
             if (doc.UpgradedFromVersion is { } v)
-                Notice = $"This piece's details file was upgraded from format version {v}. A backup was kept as .artgander.json.v{v}.bak.";
+                Notice = $"This item's details file was upgraded from format version {v}. A backup was kept as .artgander.json.v{v}.bak.";
         }
         catch (Exception ex)
         {
@@ -132,7 +133,8 @@ public sealed partial class PieceDetailViewModel(
         RebuildFiles();
         OnEditTitleChanged(EditTitle);
         if (rebuildLists) { RebuildProducts(); RebuildSales(); }
-        else UpdateSalesSummary();
+        BindProject();
+        UpdateSalesSummary();
     }
 
     private void RebuildFiles()
@@ -182,9 +184,10 @@ public sealed partial class PieceDetailViewModel(
         if (Doc is null) return;
         var rows = SalesReport.Rows((ArtPieceDocument[])[Doc]);
         var qty = rows.Sum(r => r.Sale.Quantity);
-        SalesSummary = qty == 0
+        SalesSummary = (qty == 0
             ? "No sales recorded yet."
-            : $"{qty} sold · revenue {rows.Sum(r => r.Revenue):N2} · profit {rows.Sum(r => r.Profit):N2} {Currency}";
+            : $"{qty} sold · revenue {rows.Sum(r => r.Revenue):N2} · profit {rows.Sum(r => r.Profit):N2} {Currency}")
+            + (ProjectRollupText() is { Length: > 0 } rollup ? Environment.NewLine + rollup : "");
     }
 
     // ---- Lifecycle ---------------------------------------------------------------------------------
@@ -196,6 +199,7 @@ public sealed partial class PieceDetailViewModel(
         _diskCheck.Tick -= OnDiskCheck;
         _diskCheck.Tick += OnDiskCheck;
         _diskCheck.Start();
+        if (Doc is not null) BindProject(); // e.g. back from a piece of this project
     }
 
     public void OnDisappearing() => _diskCheck?.Stop();
@@ -438,7 +442,9 @@ public sealed partial class PieceDetailViewModel(
         if (Piece is null) return;
         var product = new Product { Name = "", Currency = Currency, Type = ProductType.SelfPrint };
         Piece.Products.Add(product);
-        Products.Add(new ProductViewModel(product, Piece.Files));
+        var vm = new ProductViewModel(product, Piece.Files);
+        if (IsProject) vm.RebuildBundle(_children);
+        Products.Add(vm);
     }
 
     [RelayCommand]

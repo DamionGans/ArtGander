@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using ArtGander.App.Services;
 using ArtGander.Core.Library;
+using ArtGander.Core.Model;
 using ArtGander.Core.Naming;
 using ArtGander.Core.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -8,13 +9,21 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ArtGander.App.ViewModels;
 
+/// <summary>
+/// The library grid: art pieces and projects. Pieces inside a project are shown when you open the project,
+/// and also appear in search results (labeled with their project).
+/// </summary>
 public sealed partial class LibraryViewModel : ObservableObject
 {
     public const string AllCollections = "All collections";
+    public static IReadOnlyList<string> TypeFilters { get; } = (string[])["Pieces & projects", "Art pieces", "Projects"];
+    public static IReadOnlyList<string> TileShapes { get; } = (string[])["Portrait (3:4)", "Square", "Landscape (4:3)"];
+
     private readonly AppState _app;
     private readonly PieceService _pieces;
     private readonly IPlatformServices _platform;
     private readonly ThumbnailService _thumbs;
+    private List<PieceItemViewModel> _all = [];
 
     public LibraryViewModel(AppState app, PieceService pieces, IPlatformServices platform, ThumbnailService thumbs)
     {
@@ -35,6 +44,7 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     [ObservableProperty] public partial string SearchText { get; set; } = "";
     [ObservableProperty] public partial string SelectedCollection { get; set; } = AllCollections;
+    [ObservableProperty] public partial string TypeFilter { get; set; } = TypeFilters[0];
     [ObservableProperty] public partial bool AttentionOnly { get; set; }
     [ObservableProperty] public partial string Summary { get; set; } = "";
 
@@ -43,15 +53,19 @@ public sealed partial class LibraryViewModel : ObservableObject
     public bool IsEmpty => _app.HasRoot && !_app.IsScanning && _app.Pieces.Count == 0;
     public bool NoMatches => _app.Pieces.Count > 0 && Items.Count == 0;
 
-    // ---- Selection ---------------------------------------------------------------------------------
+    partial void OnSearchTextChanged(string value) => ApplyFilter();
+    partial void OnSelectedCollectionChanged(string value) => ApplyFilter();
+    partial void OnTypeFilterChanged(string value) => ApplyFilter();
+    partial void OnAttentionOnlyChanged(bool value) => ApplyFilter();
 
-    /// <summary>In selection mode, clicking a tile selects it instead of opening it.</summary>
-    [ObservableProperty] public partial bool IsSelecting { get; set; }
-    [ObservableProperty] public partial string SelectionText { get; set; } = "";
+    public void ShowCollection(string collection)
+    {
+        if (!CollectionFilters.Contains(collection)) CollectionFilters.Add(collection);
+        SearchText = "";
+        SelectedCollection = collection;
+    }
 
     // ---- Tile shape --------------------------------------------------------------------------------
-
-    public static IReadOnlyList<string> TileShapes { get; } = (string[])["Portrait (3:4)", "Square", "Landscape (4:3)"];
 
     /// <summary>The shape of the library tiles; remembered on this computer.</summary>
     [ObservableProperty] public partial string TileShape { get; set; } = Preferences.Default.Get("tileShape", TileShapes[0]);
@@ -73,15 +87,80 @@ public sealed partial class LibraryViewModel : ObservableObject
         Preferences.Default.Set("tileShape", value);
         OnPropertyChanged(nameof(TileHeight));
     }
+
+    // ---- Building the grid -------------------------------------------------------------------------
+
+    private void Rebuild()
+    {
+        var previous = _all.ToDictionary(i => i.Folder.FolderPath, StringComparer.Ordinal);
+        _all = _app.AllFolders.Select(p =>
+        {
+            var vm = new PieceItemViewModel(p) { IsSelecting = IsSelecting };
+            if (previous.TryGetValue(p.FolderPath, out var prev))
+            {
+                vm.IsSelected = prev.IsSelected; // keep the selection across refreshes
+                if (prev.PreviewSource == p.PreviewFilePath) vm.Thumbnail = prev.Thumbnail;
+            }
+            if (vm.Thumbnail is null) _ = vm.LoadThumbnailAsync(_thumbs);
+            return vm;
+        }).ToList();
+
+        var selected = SelectedCollection;
+        CollectionFilters.Clear();
+        CollectionFilters.Add(AllCollections);
+        foreach (var c in _app.AllCollections) CollectionFilters.Add(c);
+        SelectedCollection = CollectionFilters.Contains(selected) ? selected : AllCollections;
+
+        var projects = _app.Pieces.Count(p => p.IsProject);
+        var pieces = _app.AllFolders.Count(p => !p.IsProject);
+        var attention = _app.Pieces.Count(p => p.NeedsAttention);
+        Summary = $"{pieces} art piece{(pieces == 1 ? "" : "s")}"
+                  + (projects > 0 ? $" · {projects} project{(projects == 1 ? "" : "s")}" : "")
+                  + (attention > 0 ? $" · {attention} need attention" : "");
+        ApplyFilter();
+        UpdateSelection();
+        OnPropertyChanged(nameof(HasRoot));
+    }
+
+    private void ApplyFilter()
+    {
+        var query = SearchText.Trim();
+        var filtered = _all.Where(i =>
+            // Pieces inside projects only show up when searching; otherwise you see them by opening the project.
+            (i.Folder.Parent is null || query.Length > 0)
+            && (query.Length == 0 || i.Matches(query))
+            && (TypeFilter == TypeFilters[0] || (TypeFilter == TypeFilters[2]) == i.Folder.IsProject)
+            && (SelectedCollection == AllCollections || i.InCollection(SelectedCollection))
+            && (!AttentionOnly || i.NeedsAttention));
+
+        Items.Clear();
+        foreach (var item in filtered) Items.Add(item);
+        OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(NoMatches));
+    }
+
+    // ---- Selection ---------------------------------------------------------------------------------
+
+    /// <summary>In selection mode, clicking a tile selects it instead of opening it.</summary>
+    [ObservableProperty] public partial bool IsSelecting { get; set; }
+    [ObservableProperty] public partial string SelectionText { get; set; } = "";
     [ObservableProperty] public partial int UntrackedSelectedCount { get; set; }
     [ObservableProperty] public partial int TrackedSelectedCount { get; set; }
+    [ObservableProperty] public partial int MovablePiecesSelectedCount { get; set; }
 
     public bool CanTrackSelected => UntrackedSelectedCount > 0;
     public bool CanAddSelectedToCollection => TrackedSelectedCount > 0;
+    public bool CanGroupSelected => MovablePiecesSelectedCount > 0;
     public string TrackSelectedText => $"Start tracking ({UntrackedSelectedCount})";
     public string AddSelectedText => $"Add to collection… ({TrackedSelectedCount})";
+    public string MakeProjectText => $"Make project… ({MovablePiecesSelectedCount})";
+    public string MoveToProjectText => $"Move to project… ({MovablePiecesSelectedCount})";
 
     private IEnumerable<PieceItemViewModel> Selected => _all.Where(i => i.IsSelected);
+
+    /// <summary>Tracked art pieces (not projects) that can be moved into a project.</summary>
+    private List<PieceItemViewModel> SelectedMovablePieces =>
+        Selected.Where(i => i.Folder.Document is { IsReadOnly: false } && !i.Folder.IsProject).ToList();
 
     partial void OnIsSelectingChanged(bool value)
     {
@@ -95,11 +174,11 @@ public sealed partial class LibraryViewModel : ObservableObject
         var selected = Selected.ToList();
         UntrackedSelectedCount = selected.Count(i => !i.Folder.IsAdopted && i.Folder.Error is null);
         TrackedSelectedCount = selected.Count(i => i.Folder.Document is { IsReadOnly: false });
-        SelectionText = selected.Count == 0 ? "Click art pieces to select them" : $"{selected.Count} selected";
-        OnPropertyChanged(nameof(CanTrackSelected));
-        OnPropertyChanged(nameof(CanAddSelectedToCollection));
-        OnPropertyChanged(nameof(TrackSelectedText));
-        OnPropertyChanged(nameof(AddSelectedText));
+        MovablePiecesSelectedCount = SelectedMovablePieces.Count;
+        SelectionText = selected.Count == 0 ? "Click art pieces or projects to select them" : $"{selected.Count} selected";
+        foreach (var name in new[] { nameof(CanTrackSelected), nameof(CanAddSelectedToCollection), nameof(CanGroupSelected),
+                     nameof(TrackSelectedText), nameof(AddSelectedText), nameof(MakeProjectText), nameof(MoveToProjectText) })
+            OnPropertyChanged(name);
     }
 
     [RelayCommand]
@@ -120,8 +199,12 @@ public sealed partial class LibraryViewModel : ObservableObject
     {
         var folders = Selected.Where(i => !i.Folder.IsAdopted && i.Folder.Error is null).Select(i => i.Folder).ToList();
         if (folders.Count == 0) return;
+        var projects = folders.Count(f => f.SuggestedType == ItemType.Project);
+        var pieces = folders.Count - projects;
+        var detail = projects == 0 ? "" : $"\n\n{pieces} will be tracked as art piece{(pieces == 1 ? "" : "s")} and {projects} as project{(projects == 1 ? "" : "s")} " +
+                                          "(folders with several art subfolders). You can change this later with \"Convert to project\".";
         var ok = await Dialogs.ConfirmAsync($"Start tracking {folders.Count} folder{(folders.Count == 1 ? "" : "s")}?",
-            "ArtGander adds a hidden .artgander.json details file to each folder. Your files are not renamed or moved.", "Start tracking");
+            "ArtGander adds a hidden .artgander.json details file to each folder. Your files are not renamed or moved." + detail, "Start tracking");
         if (!ok) return;
 
         var failed = new List<string>();
@@ -129,7 +212,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         {
             foreach (var folder in folders)
             {
-                try { _pieces.AdoptFolder(folder.FolderPath, _app.Settings); }
+                try { _pieces.AdoptFolder(folder.FolderPath, _app.Settings, folder.SuggestedType); }
                 catch (Exception ex) { failed.Add($"{folder.FolderName}: {ex.Message}"); }
             }
         }
@@ -143,12 +226,12 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     private async Task AddSelectedToCollectionAsync()
     {
-        var pieces = Selected.Where(i => i.Folder.Document is { IsReadOnly: false }).ToList();
-        if (pieces.Count == 0) return;
+        var items = Selected.Where(i => i.Folder.Document is { IsReadOnly: false }).ToList();
+        if (items.Count == 0) return;
 
         const string newCollection = "New collection…";
         var options = _app.AllCollections.Append(newCollection).ToArray();
-        var choice = await Dialogs.ChooseAsync($"Add {pieces.Count} art piece{(pieces.Count == 1 ? "" : "s")} to collection", options);
+        var choice = await Dialogs.ChooseAsync($"Add {items.Count} item{(items.Count == 1 ? "" : "s")} to collection", options);
         if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
         if (choice == newCollection)
         {
@@ -157,7 +240,7 @@ public sealed partial class LibraryViewModel : ObservableObject
             choice = choice.Trim();
             if (!_app.Settings.Collections.Any(c => NameRules.NamesEqual(c.Name, choice)))
             {
-                _app.Settings.Collections.Add(new Core.Model.CollectionInfo { Name = choice });
+                _app.Settings.Collections.Add(new CollectionInfo { Name = choice });
                 _app.SaveSettings();
             }
         }
@@ -166,69 +249,67 @@ public sealed partial class LibraryViewModel : ObservableObject
         var added = 0;
         using (_app.SuspendWatching())
         {
+            foreach (var item in items)
+            {
+                try { if (_pieces.AddToCollection(item.Folder.FolderPath, choice)) added++; }
+                catch (Exception ex) { failed.Add($"{item.Title}: {ex.Message}"); }
+            }
+        }
+        IsSelecting = false;
+        await _app.RefreshAsync();
+        if (failed.Count > 0) await Dialogs.AlertAsync("Some items were not updated", string.Join(Environment.NewLine, failed));
+        else Summary = $"Added {added} item{(added == 1 ? "" : "s")} to \"{choice}\" · " + Summary;
+    }
+
+    [RelayCommand]
+    private void MakeProject() => Ui.Fire(MakeProjectAsync);
+
+    private async Task MakeProjectAsync()
+    {
+        var pieces = SelectedMovablePieces;
+        if (pieces.Count == 0 || !_app.HasRoot) return;
+        var title = await Dialogs.PromptAsync("Make project",
+            $"The {pieces.Count} selected art piece{(pieces.Count == 1 ? "" : "s")} move into a new project folder. Project title:",
+            accept: "Make project", placeholder: "e.g. The Goose Book");
+        if (string.IsNullOrWhiteSpace(title)) return;
+
+        string projectFolder;
+        using (_app.SuspendWatching())
+            projectFolder = _pieces.GroupIntoProject(_app.RootPath!, title, pieces.Select(p => p.Folder.FolderPath).ToList(), _app.Settings).FolderPath;
+        IsSelecting = false;
+        await _app.RefreshAsync();
+        await OpenPieceAsync(projectFolder, "pieces");
+    }
+
+    [RelayCommand]
+    private void MoveToProject() => Ui.Fire(MoveToProjectAsync);
+
+    private async Task MoveToProjectAsync()
+    {
+        var pieces = SelectedMovablePieces;
+        if (pieces.Count == 0 || !_app.HasRoot) return;
+        const string library = "No project (back to the library)";
+        var projects = _app.Pieces.Where(p => p is { IsProject: true, Document.IsReadOnly: false }).ToList();
+        var choice = await Dialogs.ChooseAsync($"Move {pieces.Count} art piece{(pieces.Count == 1 ? "" : "s")} to",
+            projects.Select(p => p.Title).Append(library).ToArray());
+        if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
+        var target = choice == library ? _app.RootPath! : projects.First(p => p.Title == choice).FolderPath;
+
+        var failed = new List<string>();
+        using (_app.SuspendWatching())
+        {
             foreach (var piece in pieces)
             {
-                try { if (_pieces.AddToCollection(piece.Folder.FolderPath, choice)) added++; }
+                try { _pieces.MovePiece(piece.Folder.Document!, target); }
                 catch (Exception ex) { failed.Add($"{piece.Title}: {ex.Message}"); }
             }
         }
         IsSelecting = false;
         await _app.RefreshAsync();
-        if (failed.Count > 0) await Dialogs.AlertAsync("Some pieces were not updated", string.Join(Environment.NewLine, failed));
-        else Summary = $"Added {added} art piece{(added == 1 ? "" : "s")} to \"{choice}\" · " + Summary;
+        if (failed.Count > 0) await Dialogs.AlertAsync("Some pieces were not moved", string.Join(Environment.NewLine, failed));
     }
 
-    partial void OnSearchTextChanged(string value) => ApplyFilter();
-    partial void OnSelectedCollectionChanged(string value) => ApplyFilter();
-    partial void OnAttentionOnlyChanged(bool value) => ApplyFilter();
-
-    public void ShowCollection(string collection)
-    {
-        if (!CollectionFilters.Contains(collection)) CollectionFilters.Add(collection);
-        SearchText = "";
-        SelectedCollection = collection;
-    }
-
-    private List<PieceItemViewModel> _all = [];
-
-    private void Rebuild()
-    {
-        var previous = _all.ToDictionary(i => i.Folder.FolderPath, StringComparer.Ordinal);
-        _all = _app.Pieces.Select(p =>
-        {
-            var vm = new PieceItemViewModel(p, _app.Currency) { IsSelecting = IsSelecting };
-            if (previous.TryGetValue(p.FolderPath, out var prev)) vm.IsSelected = prev.IsSelected; // keep selection across refreshes
-            if (previous.TryGetValue(p.FolderPath, out var old) && old.PreviewSource == p.PreviewFilePath) vm.Thumbnail = old.Thumbnail;
-            else _ = vm.LoadThumbnailAsync(_thumbs);
-            return vm;
-        }).ToList();
-
-        var selected = SelectedCollection;
-        CollectionFilters.Clear();
-        CollectionFilters.Add(AllCollections);
-        foreach (var c in _app.AllCollections) CollectionFilters.Add(c);
-        SelectedCollection = CollectionFilters.Contains(selected) ? selected : AllCollections;
-
-        var attention = _app.Pieces.Count(p => p.NeedsAttention);
-        Summary = $"{_app.Pieces.Count} art piece{(_app.Pieces.Count == 1 ? "" : "s")}" + (attention > 0 ? $" · {attention} need attention" : "");
-        ApplyFilter();
-        UpdateSelection();
-        OnPropertyChanged(nameof(HasRoot));
-    }
-
-    private void ApplyFilter()
-    {
-        var query = SearchText.Trim();
-        var filtered = _all.Where(i =>
-            (query.Length == 0 || i.Matches(query))
-            && (SelectedCollection == AllCollections || i.InCollection(SelectedCollection))
-            && (!AttentionOnly || i.NeedsAttention));
-
-        Items.Clear();
-        foreach (var item in filtered) Items.Add(item);
-        OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(NoMatches));
-    }
+    // ---- Commands ----------------------------------------------------------------------------------
 
     [RelayCommand]
     private async Task ChooseFolderAsync()
@@ -244,15 +325,21 @@ public sealed partial class LibraryViewModel : ObservableObject
     private async Task NewPieceAsync()
     {
         if (!_app.HasRoot) { await ChooseFolderAsync(); if (!_app.HasRoot) return; }
-        var title = await Dialogs.PromptAsync("New art piece", "What is the title of the new piece?", accept: "Create", placeholder: "e.g. Goose On The Loose");
+        const string piece = "Art piece", project = "Project (e.g. a book: several art pieces together)";
+        var kind = await Dialogs.ChooseAsync("Create new", piece, project);
+        if (kind is not (piece or project)) return;
+        var isProject = kind == project;
+        var title = await Dialogs.PromptAsync(isProject ? "New project" : "New art piece",
+            isProject ? "What is the title of the new project?" : "What is the title of the new piece?",
+            accept: "Create", placeholder: isProject ? "e.g. The Goose Book" : "e.g. Goose On The Loose");
         if (string.IsNullOrWhiteSpace(title)) return;
         try
         {
             using (_app.SuspendWatching())
             {
-                var doc = _pieces.CreatePiece(_app.RootPath!, title, _app.Settings);
+                var doc = isProject ? _pieces.CreateProject(_app.RootPath!, title, _app.Settings) : _pieces.CreatePiece(_app.RootPath!, title, _app.Settings);
                 await _app.RefreshAsync();
-                await OpenPieceAsync(doc.FolderPath);
+                await OpenPieceAsync(doc.FolderPath, isProject ? "pieces" : null);
             }
         }
         catch (Exception ex) { await Dialogs.ErrorAsync(ex); }
@@ -274,22 +361,34 @@ public sealed partial class LibraryViewModel : ObservableObject
         {
             if (item.Folder.Error is { } error)
             {
-                await Dialogs.AlertAsync("Can't open this piece", $"{error}\n\nFix or remove the hidden .artgander.json file in:\n{item.Folder.FolderPath}");
+                await Dialogs.AlertAsync("Can't open this item", $"{error}\n\nFix or remove the hidden .artgander.json file in:\n{item.Folder.FolderPath}");
                 return;
             }
-            var files = item.Folder.UntrackedFiles.Count;
-            var ok = await Dialogs.ConfirmAsync("Start tracking this folder?",
-                $"\"{item.Folder.FolderName}\" has no ArtGander details yet ({files} file{(files == 1 ? "" : "s")}). " +
-                "ArtGander will add a hidden .artgander.json details file to it. Your files are not renamed or moved.", "Track folder");
-            if (!ok) return;
+            var type = await AskTrackTypeAsync(item.Folder);
+            if (type is null) return;
             try
             {
-                using (_app.SuspendWatching()) _pieces.AdoptFolder(item.Folder.FolderPath, _app.Settings);
+                using (_app.SuspendWatching()) _pieces.AdoptFolder(item.Folder.FolderPath, _app.Settings, type);
                 await _app.RefreshAsync();
             }
             catch (Exception ex) { await Dialogs.ErrorAsync(ex); return; }
         }
         await OpenPieceAsync(item.Folder.FolderPath);
+    }
+
+    /// <summary>Asks how to track a folder, with the smart suggestion first.</summary>
+    private static async Task<ItemType?> AskTrackTypeAsync(PieceFolder folder)
+    {
+        var asPiece = "Track as art piece";
+        var asProject = $"Track as project ({folder.ArtSubfolderCount} art subfolder{(folder.ArtSubfolderCount == 1 ? "" : "s")} become its pieces)";
+        var suggestedProject = folder.SuggestedType == ItemType.Project;
+        string[] options = suggestedProject ? [asProject + " (suggested)", asPiece] : [asPiece + " (suggested)", asProject];
+        var files = folder.UntrackedFiles.Count;
+        var choice = await Dialogs.ChooseAsync(
+            $"Start tracking \"{folder.FolderName}\"? ({files} file{(files == 1 ? "" : "s")}; a hidden details file is added, nothing is renamed or moved)",
+            options);
+        if (string.IsNullOrEmpty(choice) || choice == "Cancel") return null;
+        return choice.StartsWith(asProject, StringComparison.Ordinal) ? ItemType.Project : ItemType.Piece;
     }
 
     public static Task OpenPieceAsync(string folderPath, string? tab = null) =>
@@ -300,11 +399,12 @@ public sealed partial class LibraryViewModel : ObservableObject
         });
 }
 
-public sealed partial class PieceItemViewModel(PieceFolder folder, string currency) : ObservableObject
+public sealed partial class PieceItemViewModel(PieceFolder folder) : ObservableObject
 {
     public PieceFolder Folder { get; } = folder;
-    public string Title => Folder.Title;
+    public string Title => Folder.Parent is null ? Folder.Title : Folder.DisplayPath;
     public string? PreviewSource => Folder.PreviewFilePath;
+    public bool IsProject => Folder.IsProject;
 
     [ObservableProperty] public partial ImageSource? Thumbnail { get; set; }
     [ObservableProperty] public partial bool IsSelected { get; set; }
@@ -312,16 +412,30 @@ public sealed partial class PieceItemViewModel(PieceFolder folder, string curren
 
     public bool NeedsAttention => Folder.NeedsAttention;
 
+    /// <summary>A short badge in the tile's corner: "PROJECT" or the work status when it isn't finished.</summary>
+    public string Badge => Folder.IsProject ? "PROJECT"
+        : Folder.Document?.Piece.Status is WorkStatus.Planned or WorkStatus.Idea or WorkStatus.InProgress
+            ? Converters.HumanizeConverter.Humanize(Folder.Document.Piece.Status.ToString()).ToUpperInvariant()
+            : "";
+
     public string Subtitle
     {
         get
         {
             if (Folder.Error is not null) return "Can't read its details file";
-            if (!Folder.IsAdopted) return "Not tracked yet: click to start";
+            if (!Folder.IsAdopted)
+                return Folder.SuggestedType == ItemType.Project
+                    ? $"Not tracked yet · looks like a project ({Folder.ArtSubfolderCount} pieces)"
+                    : "Not tracked yet: click to start";
             var p = Folder.Document!.Piece;
             var parts = new List<string>();
+            if (p.IsProject)
+            {
+                parts.Add($"{Folder.Children.Count} piece{(Folder.Children.Count == 1 ? "" : "s")}");
+                parts.Add(Converters.HumanizeConverter.Humanize(p.Status.ToString()));
+            }
             if (p.Collections.Count > 0) parts.Add(string.Join(", ", p.Collections));
-            parts.Add($"{p.Files.Count} file{(p.Files.Count == 1 ? "" : "s")}");
+            if (!p.IsProject) parts.Add($"{p.Files.Count} file{(p.Files.Count == 1 ? "" : "s")}");
             if (p.Products.Count > 0) parts.Add($"{p.Products.Count} product{(p.Products.Count == 1 ? "" : "s")}");
             return string.Join(" · ", parts);
         }
@@ -333,10 +447,13 @@ public sealed partial class PieceItemViewModel(PieceFolder folder, string curren
         {
             if (Folder.Error is not null) return "⚠ Error";
             if (!Folder.IsAdopted) return "";
+            if (Folder.LooksLikeProject) return "⚠ Looks like a project";
             var parts = new List<string>();
             if (Folder.UntrackedFiles.Count > 0) parts.Add($"{Folder.UntrackedFiles.Count} new");
             if (Folder.MissingFiles.Count > 0) parts.Add($"{Folder.MissingFiles.Count} missing");
             if (Folder.MisnamedFiles.Count > 0) parts.Add($"{Folder.MisnamedFiles.Count} misnamed");
+            var childIssues = Folder.Children.Count(c => c.NeedsAttention);
+            if (childIssues > 0) parts.Add($"{childIssues} piece{(childIssues == 1 ? "" : "s")}");
             return parts.Count == 0 ? "" : "⚠ " + string.Join(", ", parts);
         }
     }
@@ -347,12 +464,10 @@ public sealed partial class PieceItemViewModel(PieceFolder folder, string curren
         {
             var p = Folder.Document?.Piece;
             if (p is null) return "";
-            var sold = p.Sales.Sum(s => s.Quantity);
+            var sold = p.Sales.Sum(s => s.Quantity) + Folder.Children.Sum(c => c.Document?.Piece.Sales.Sum(s => s.Quantity) ?? 0);
             return sold > 0 ? $"{sold} sold" : "";
         }
     }
-
-    public string Currency { get; } = currency;
 
     public bool Matches(string query)
     {

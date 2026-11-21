@@ -25,6 +25,12 @@ public static class FileKind
     public static IReadOnlyList<string> Defaults { get; } = [Photo, Scan, Master, Edit, Transparent, Print, Mockup, Other];
 }
 
+[JsonConverter(typeof(CamelCaseEnumConverter<ItemType>))]
+public enum ItemType { Piece, Project }
+
+[JsonConverter(typeof(CamelCaseEnumConverter<WorkStatus>))]
+public enum WorkStatus { Idea, Planned, InProgress, Finished, Published }
+
 [JsonConverter(typeof(CamelCaseEnumConverter<OriginalStatus>))]
 public enum OriginalStatus { Available, Reserved, Sold, NotForSale, Gifted }
 

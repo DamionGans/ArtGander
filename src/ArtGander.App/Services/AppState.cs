@@ -37,7 +37,15 @@ public sealed partial class AppState : ObservableObject, IDisposable
     /// <summary>Raised on the UI thread after every rescan.</summary>
     public event EventHandler? LibraryChanged;
 
-    public IEnumerable<ArtPieceDocument> Documents => Pieces.Select(p => p.Document).OfType<ArtPieceDocument>();
+    /// <summary>Every folder: top-level pieces and projects, plus the pieces inside projects.</summary>
+    public IEnumerable<PieceFolder> AllFolders => Pieces.SelectMany(p => p.Children.Prepend(p));
+
+    /// <summary>Every tracked piece and project, including pieces inside projects.</summary>
+    public IEnumerable<ArtPieceDocument> Documents => AllFolders.Select(p => p.Document).OfType<ArtPieceDocument>();
+
+    /// <summary>Finds the scanned folder (piece or project, at any level) for a path.</summary>
+    public PieceFolder? FindFolder(string folderPath) =>
+        AllFolders.FirstOrDefault(f => Core.Naming.NameRules.NamesEqual(Path.GetFullPath(f.FolderPath), Path.GetFullPath(folderPath)));
 
     public string Currency => string.IsNullOrWhiteSpace(Settings.DefaultCurrency) ? "EUR" : Settings.DefaultCurrency;
 
@@ -83,6 +91,7 @@ public sealed partial class AppState : ObservableObject, IDisposable
             var (pieces, settings, orders) = await Task.Run(() => (_scanner.Scan(root, cts.Token), LibrarySettingsStore.Load(root), OrderStore.LoadAll(root)), cts.Token);
             if (cts.IsCancellationRequested) return;
             Pieces = pieces;
+            if (_watcher is not null) _watcher.ProjectFolders = pieces.Where(p => p.IsProject).Select(p => p.FolderPath).ToList();
             Settings = settings;
             Orders = orders;
             LastError = null;

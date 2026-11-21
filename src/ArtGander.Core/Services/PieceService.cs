@@ -8,20 +8,23 @@ namespace ArtGander.Core.Services;
 /// Every operation that changes files or folders in the art library. Each one keeps the folder,
 /// the file names and <c>artgander.json</c> consistent with each other.
 /// </summary>
-public sealed class PieceService(ArtPieceStore store)
+public sealed partial class PieceService(ArtPieceStore store)
 {
     public ArtPieceStore Store => store;
 
-    /// <summary>Creates <c>{root}/{Title}/artgander.json</c>.</summary>
-    public ArtPieceDocument CreatePiece(string rootPath, string title, LibrarySettings? defaults = null)
+    /// <summary>Creates <c>{parent}/{Title}/.artgander.json</c>. The parent is the art folder, or a project folder.</summary>
+    public ArtPieceDocument CreatePiece(string parentPath, string title, LibrarySettings? defaults = null,
+        ItemType type = ItemType.Piece, WorkStatus status = WorkStatus.InProgress)
     {
         var folderName = NameRules.ToFolderName(title);
-        var folder = Path.Combine(rootPath, folderName);
+        var folder = Path.Combine(parentPath, folderName);
         if (Directory.Exists(folder))
-            throw new IOException($"A folder named \"{folderName}\" already exists in the art folder.");
+            throw new IOException($"A folder named \"{folderName}\" already exists there.");
 
         var piece = new ArtPiece
         {
+            Type = type,
+            Status = status,
             Title = title.Trim(),
             CreatedOn = DateOnly.FromDateTime(DateTime.Today),
             Copyright = new Copyright
@@ -33,12 +36,19 @@ public sealed class PieceService(ArtPieceStore store)
         return store.Create(folder, piece);
     }
 
-    /// <summary>Turns an existing folder without <c>artgander.json</c> into an art piece. Existing files are tracked as they are, without renaming.</summary>
-    public ArtPieceDocument AdoptFolder(string folderPath, LibrarySettings? defaults = null)
+    /// <summary>
+    /// Starts tracking an existing folder as an art piece or a project (<paramref name="type"/>; when null the
+    /// folder's look decides, see <see cref="Library.FolderClassifier"/>). Existing files are tracked as they are,
+    /// without renaming. For a project, its untracked art subfolders are tracked as its pieces.
+    /// </summary>
+    public ArtPieceDocument AdoptFolder(string folderPath, LibrarySettings? defaults = null, ItemType? type = null)
     {
         var folderName = Path.GetFileName(folderPath);
+        var itemType = type ?? Library.FolderClassifier.Suggest(folderPath);
         var piece = new ArtPiece
         {
+            Type = itemType,
+            Status = WorkStatus.Finished,
             Title = folderName,
             CreatedOn = DateOnly.FromDateTime(Directory.GetCreationTime(folderPath)),
             Copyright = new Copyright { Owner = defaults?.DefaultCopyrightOwner ?? "", Year = Directory.GetCreationTime(folderPath).Year },
@@ -48,7 +58,9 @@ public sealed class PieceService(ArtPieceStore store)
             var version = FileNamer.SuggestVersion(folderName, file);
             piece.Files.Add(NewEntry(file, version, GuessKind(version, Path.GetExtension(file), defaults?.FileKinds)));
         }
-        return store.Create(folderPath, piece);
+        var doc = store.Create(folderPath, piece);
+        if (itemType == ItemType.Project) TrackProjectChildren(doc, defaults);
+        return doc;
     }
 
     /// <summary>

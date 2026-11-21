@@ -24,7 +24,8 @@ Download the latest installer from the repository's **Releases** page, or from t
 
 ## Features
 
-* Library grid with thumbnails, search, collection filter and a "needs attention" filter
+* **Art pieces and projects:** a project (e.g. a book) is a folder with its own files plus one folder per art piece, with page order, planned pieces, status, and bundle products; folders are recognized as piece or project automatically
+* Library grid with thumbnail tiles (portrait/square/landscape), search (also inside projects), type and collection filters, multi-select to track, add to a collection, make a project or move into one
 * Per piece: description, collections, tags, details of the original, notes
 * Files: add or drop files, which are copied in under the naming convention; rename a version, which renames the file; detects new, missing and misnamed files
 * Products: link any files to each product, with price, production cost and breakdown, margin, edition, stock, and listings per channel (Shopify, Printify, in person…)

@@ -43,6 +43,9 @@ public sealed class LibraryWatcher : IDisposable
         }
     }
 
+    /// <summary>Project folders whose piece subfolders are polled too (set after each scan).</summary>
+    public IReadOnlyList<string> ProjectFolders { get; set; } = [];
+
     /// <summary>Raised on a thread-pool thread, debounced, when the library may have changed.</summary>
     public event EventHandler? Changed;
 
@@ -80,7 +83,7 @@ public sealed class LibraryWatcher : IDisposable
 
     private string SafeFingerprint()
     {
-        try { return LibraryScanner.Fingerprint(_root); }
+        try { return LibraryScanner.Fingerprint(_root, ProjectFolders); }
         catch (Exception) { return ""; }
     }
 

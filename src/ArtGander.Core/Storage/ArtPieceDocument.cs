@@ -16,6 +16,12 @@ public sealed class ArtPieceDocument
 
     public string FolderPath { get; internal set; }
     public string FolderName => Path.GetFileName(FolderPath);
+
+    /// <summary>For an art piece inside a project: the project's title (set by the library scanner).</summary>
+    public string? ProjectTitle { get; set; }
+
+    /// <summary>"Project › Piece" for pieces inside a project, otherwise the title.</summary>
+    public string DisplayTitle => ProjectTitle is null ? Piece.Title : ProjectTitle + " › " + Piece.Title;
     public string FilePath => Path.Combine(FolderPath, CurrentSchema.PieceFileName);
     public ArtPiece Piece { get; }
 

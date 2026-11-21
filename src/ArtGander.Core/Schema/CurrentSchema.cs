@@ -13,7 +13,7 @@ namespace ArtGander.Core.Schema;
 /// </summary>
 public static class CurrentSchema
 {
-    public const int Version = 1;
+    public const int Version = 2;
 
     /// <summary>
     /// The name of the details file inside every art piece folder. The leading dot hides it on macOS/Linux,

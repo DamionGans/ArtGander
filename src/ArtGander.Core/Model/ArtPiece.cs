@@ -1,11 +1,15 @@
 using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 using ArtGander.Core.Naming;
 using ArtGander.Core.Schema;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ArtGander.Core.Model;
 
-/// <summary>The root object of an art piece's <c>artgander.json</c> file.</summary>
+/// <summary>
+/// The root object of a <c>.artgander.json</c> file. It describes either an <b>art piece</b> or a <b>project</b>
+/// (see <see cref="Type"/>). A project is a folder that holds project-only files plus one subfolder per art piece.
+/// </summary>
 public sealed partial class ArtPiece : ModelBase
 {
     /// <summary>The file's structure version. Upgraded automatically when the file is loaded.</summary>
@@ -13,6 +17,12 @@ public sealed partial class ArtPiece : ModelBase
 
     /// <summary>A stable identity that survives folder renames.</summary>
     public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>Whether this folder is a single art piece or a project (a group of pieces, e.g. a book).</summary>
+    [ObservableProperty] public partial ItemType Type { get; set; } = ItemType.Piece;
+
+    /// <summary>Where the work stands. "planned" pieces are placeholders that have no files yet.</summary>
+    [ObservableProperty] public partial WorkStatus Status { get; set; } = WorkStatus.InProgress;
 
     [ObservableProperty] public partial string Title { get; set; } = "";
     [ObservableProperty] public partial string Description { get; set; } = "";
@@ -31,6 +41,11 @@ public sealed partial class ArtPiece : ModelBase
     public ObservableCollection<Sale> Sales { get; set; } = [];
 
     [ObservableProperty] public partial string Notes { get; set; } = "";
+
+    /// <summary>Projects only: the order of the pieces (e.g. book pages), by piece id. Pieces not listed come after, by title.</summary>
+    public ObservableCollection<Guid> PieceOrder { get; set; } = [];
+
+    [JsonIgnore] public bool IsProject => Type == ItemType.Project;
 
     public FileEntry? FindFile(string fileName) =>
         Files.FirstOrDefault(f => NameRules.NamesEqual(f.FileName, fileName));
@@ -93,8 +108,11 @@ public sealed partial class Product : ModelBase
     public ObservableCollection<Listing> Listings { get; set; } = [];
     [ObservableProperty] public partial string Notes { get; set; } = "";
 
+    /// <summary>Project products only: the pieces (and optionally their products) a bundle contains, e.g. "Set of 3 prints".</summary>
+    public ObservableCollection<BundleItem> Includes { get; set; } = [];
+
     /// <summary>The price minus the production cost, or null when either is unknown.</summary>
-    public decimal? Margin => Price is { } p && ProductionCost is { } c ? p - c : null;
+    [JsonIgnore] public decimal? Margin => Price is { } p && ProductionCost is { } c ? p - c : null;
 
     partial void OnPriceChanged(decimal? value) => OnPropertyChanged(nameof(Margin));
     partial void OnProductionCostChanged(decimal? value) => OnPropertyChanged(nameof(Margin));
@@ -126,4 +144,13 @@ public sealed partial class Sale : ModelBase
     [ObservableProperty] public partial string Currency { get; set; } = "EUR";
     [ObservableProperty] public partial string Customer { get; set; } = "";
     [ObservableProperty] public partial string Notes { get; set; } = "";
+}
+
+/// <summary>One art piece inside a project bundle product.</summary>
+public sealed partial class BundleItem : ModelBase
+{
+    [ObservableProperty] public partial Guid PieceId { get; set; }
+    /// <summary>Optional: the piece's product that is included (its production cost is used for "Use pieces' cost").</summary>
+    [ObservableProperty] public partial Guid? ProductId { get; set; }
+    [ObservableProperty] public partial int Quantity { get; set; } = 1;
 }
