@@ -7,7 +7,7 @@ namespace ArtGander.Core.Integrations;
 /// Printify REST API v1 (https://developers.printify.com). Authenticated with a personal access token.
 /// Prices and costs are whole cents in the API and decimals here.
 /// </summary>
-public sealed class PrintifyClient(ApiHttp http, string token)
+public sealed class PrintifyClient(ApiHttp http, string token) : IPrintifyApi
 {
     public const string BaseUrl = "https://api.printify.com/v1/";
 

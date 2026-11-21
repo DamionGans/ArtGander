@@ -56,7 +56,7 @@ public sealed class ShopifyAuth(HttpClient http, string shopDomain, string clien
 }
 
 /// <summary>Shopify Admin GraphQL API.</summary>
-public sealed class ShopifyClient(ApiHttp http, ShopifyAuth auth, string apiVersion = ShopifyClient.DefaultApiVersion)
+public sealed class ShopifyClient(ApiHttp http, ShopifyAuth auth, string apiVersion = ShopifyClient.DefaultApiVersion) : IShopifyApi
 {
     /// <summary>A stable Admin API version. Shopify supports each version for at least 12 months; it can be changed in Settings.</summary>
     public const string DefaultApiVersion = "2026-10";

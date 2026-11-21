@@ -52,7 +52,48 @@ public sealed partial class ConflictChoice(FieldChange change) : ObservableObjec
     [ObservableProperty] public partial bool TakeShop { get; set; }
 }
 
-/// <summary>The Shops page: import products and orders from Printify and Shopify (and, later, push changes).</summary>
+/// <summary>One field in the sync preview, with your choice.</summary>
+public sealed partial class SyncChangeRow : ObservableObject
+{
+    public static IReadOnlyList<string> Options { get; } = ["Send ArtGander's", "Take the shop's", "Skip for now"];
+
+    public SyncChangeRow(Core.Model.Product product, SyncFieldChange change)
+    {
+        Product = product;
+        Change = change;
+        Choice = change.DefaultResolution switch { SyncResolution.Push => Options[0], SyncResolution.TakeRemote => Options[1], _ => Options[2] };
+    }
+
+    public Core.Model.Product Product { get; }
+    public SyncFieldChange Change { get; }
+    public string Where => Change.Channel == "printify" ? "Printify" : "Shopify";
+    public string KindText => Change.Kind switch
+    {
+        SyncChangeKind.Push => "changed in ArtGander",
+        SyncChangeKind.OutsideEdit => $"changed in {Where}",
+        SyncChangeKind.Conflict => "changed on both sides",
+        _ => $"updated by {Where} (sales)",
+    };
+    public bool IsConflict => Change.Kind == SyncChangeKind.Conflict;
+    public string Values => $"ArtGander: {Short(Change.Local)}   ·   {Where}: {Short(Change.Remote)}";
+    [ObservableProperty] public partial string Choice { get; set; }
+
+    public SyncResolution Resolution => Choice == Options[0] ? SyncResolution.Push : Choice == Options[1] ? SyncResolution.TakeRemote : SyncResolution.Skip;
+
+    private static string Short(string? s) => string.IsNullOrEmpty(s) ? "(empty)" : s.Length > 80 ? s[..80].ReplaceLineEndings(" ") + "…" : s.ReplaceLineEndings(" ");
+}
+
+/// <summary>One product in the sync preview.</summary>
+public sealed class SyncPlanRow(ProductSyncPlan plan)
+{
+    public ProductSyncPlan Plan { get; } = plan;
+    public string Title => Plan.Product.Name;
+    public string? Problem => Plan.Problem;
+    public bool HasProblem => Plan.Problem is not null;
+    public List<SyncChangeRow> Changes { get; } = [.. plan.Changes.Select(c => new SyncChangeRow(plan.Product, c))];
+}
+
+/// <summary>The Shops page: import products and orders from Printify and Shopify, and sync product changes.</summary>
 public sealed partial class ShopsViewModel(AppState app, ImportService import) : ObservableObject
 {
     [ObservableProperty] public partial bool IsBusy { get; set; }
@@ -60,6 +101,8 @@ public sealed partial class ShopsViewModel(AppState app, ImportService import) :
     [ObservableProperty] public partial string ConnectionText { get; set; } = "";
 
     public ObservableCollection<ProductImportRow> ProductRows { get; } = [];
+    public ObservableCollection<SyncPlanRow> SyncRows { get; } = [];
+    public bool HasSyncRows => SyncRows.Any(r => !r.HasProblem);
     public ObservableCollection<OrderImportRow> OrderRows { get; } = [];
     public bool HasProductRows => ProductRows.Count > 0;
     public bool HasOrderRows => OrderRows.Count > 0;
@@ -74,6 +117,61 @@ public sealed partial class ShopsViewModel(AppState app, ImportService import) :
             s.ShopifyDomain.Length > 0 ? $"Shopify: {s.ShopifyDomain}" : "Shopify: not connected (Settings → Shops)",
             state.LastOrderImport is { } o ? $"Orders last imported {o:g}" : "Orders not imported yet",
         });
+    }
+
+    // ---- Sync -----------------------------------------------------------------------------------------
+
+    [RelayCommand]
+    private void CheckSync() => Ui.Fire(CheckSyncAsync);
+
+    private async Task CheckSyncAsync()
+    {
+        if (!app.HasRoot || IsBusy) return;
+        IsBusy = true;
+        Status = "Comparing your products with the shops…";
+        try
+        {
+            await app.RefreshAsync();
+            var plans = await import.CheckProductsAsync(app.Settings, CancellationToken.None);
+            SyncRows.Clear();
+            foreach (var p in plans) SyncRows.Add(new SyncPlanRow(p));
+            var fields = plans.Sum(p => p.Changes.Count);
+            var conflicts = plans.Sum(p => p.Changes.Count(c => c.Kind == SyncChangeKind.Conflict));
+            Status = plans.Count == 0 ? "All linked products match the shops." :
+                $"{plans.Count} product(s), {fields} difference(s)" + (conflicts > 0 ? $", {conflicts} changed on both sides (skipped unless you choose)." : ".")
+                + " Nothing is sent until you press Sync now.";
+        }
+        catch (Exception ex) { Status = "Couldn't compare: " + ex.Message; }
+        finally { IsBusy = false; OnPropertyChanged(nameof(HasSyncRows)); }
+    }
+
+    [RelayCommand]
+    private void ApplySync() => Ui.Fire(ApplySyncAsync);
+
+    private async Task ApplySyncAsync()
+    {
+        if (!app.HasRoot || IsBusy) return;
+        var rows = SyncRows.Where(r => !r.HasProblem).ToList();
+        var changes = rows.SelectMany(r => r.Changes).ToList();
+        var send = changes.Count(c => c.Resolution == SyncResolution.Push);
+        var take = changes.Count(c => c.Resolution == SyncResolution.TakeRemote);
+        if (send + take == 0) { Status = "Everything is set to skip."; return; }
+        if (send > 0 && !await Dialogs.ConfirmAsync("Send changes to the shops?",
+                $"{send} change(s) will be sent to Printify/Shopify and {take} taken over into ArtGander. Products changed in the meantime are skipped.", "Sync now"))
+            return;
+        IsBusy = true;
+        Status = "Syncing…";
+        try
+        {
+            var choices = changes.ToDictionary(c => Core.Integrations.SyncRunner.ChoiceKey(c.Product, c.Change), c => c.Resolution);
+            var outcomes = await import.ApplySyncAsync(app.RootPath!, app.Settings, rows.Select(r => r.Plan).ToList(), choices, CancellationToken.None);
+            var failed = outcomes.Where(o => !o.Done).ToList();
+            Status = $"Synced {outcomes.Count(o => o.Done)} product(s)." + (failed.Count > 0 ? " Not done: " + string.Join("; ", failed.Select(f => $"{f.Product.Name}: {f.Message}")) : "");
+            SyncRows.Clear();
+            await app.RefreshAsync();
+        }
+        catch (Exception ex) { Status = "Sync failed: " + ex.Message; }
+        finally { IsBusy = false; OnPropertyChanged(nameof(HasSyncRows)); }
     }
 
     // ---- Products -------------------------------------------------------------------------------------

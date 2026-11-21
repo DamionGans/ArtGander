@@ -64,6 +64,60 @@ public sealed class ImportService(Connections connections, ProductCatalog catalo
         return new ApplyResult(saved, skipped);
     }
 
+    // ---- Product sync -----------------------------------------------------------------------------------
+
+    /// <summary>Reads the shops and works out, field by field, what syncing the linked products would do. Read-only.</summary>
+    public async Task<List<ProductSyncPlan>> CheckProductsAsync(LibrarySettings settings, CancellationToken ct)
+    {
+        var printify = await connections.PrintifyAsync();
+        var shopify = await connections.ShopifyAsync(settings.Integrations);
+        var linked = catalog.All.Where(p => p.IsOnPrintify || p.IsOnShopify).ToList();
+        IReadOnlyList<RemoteProduct> pp = [], sp = [];
+        if (linked.Any(p => p.IsOnPrintify))
+        {
+            if (printify is null || settings.Integrations.PrintifyShopId is not { } shopId) throw new InvalidOperationException("Printify isn't connected on this computer (Settings → Shops).");
+            pp = await printify.GetProductsAsync(shopId, ct);
+        }
+        if (linked.Any(p => p.IsOnShopify))
+        {
+            if (shopify is null) throw new InvalidOperationException("Shopify isn't connected on this computer (Settings → Shops).");
+            sp = await shopify.GetProductsAsync(ct);
+        }
+        return SyncPlanner.Plan(linked, pp, sp);
+    }
+
+    /// <summary>Carries out the approved sync, and writes a log in <c>.artgander/sync/log/</c>.</summary>
+    public async Task<List<SyncOutcome>> ApplySyncAsync(string root, LibrarySettings settings, IReadOnlyList<ProductSyncPlan> plans,
+        IReadOnlyDictionary<string, SyncResolution> choices, CancellationToken ct)
+    {
+        var runner = new SyncRunner(catalog, await connections.PrintifyAsync(), await connections.ShopifyAsync(settings.Integrations));
+        var outcomes = await runner.ApplyAsync(root, plans, choices, ct);
+        WriteLog(root, plans, choices, outcomes);
+        return outcomes;
+    }
+
+    private static void WriteLog(string root, IReadOnlyList<ProductSyncPlan> plans, IReadOnlyDictionary<string, SyncResolution> choices, List<SyncOutcome> outcomes)
+    {
+        try
+        {
+            var folder = Path.Combine(root, Schema.CurrentSchema.LibraryFolderName, "sync", "log");
+            Directory.CreateDirectory(folder);
+            var lines = new List<string> { $"# Sync {DateTimeOffset.Now:O} on {Environment.MachineName}" };
+            foreach (var plan in plans)
+            {
+                var outcome = outcomes.FirstOrDefault(o => o.Product.Id == plan.Product.Id);
+                lines.Add($"{plan.Product.Name}: {(outcome is null ? plan.Problem ?? "not run" : (outcome.Done ? "done" : "skipped") + " - " + outcome.Message)}");
+                foreach (var c in plan.Changes)
+                {
+                    var choice = choices.TryGetValue(SyncRunner.ChoiceKey(plan.Product, c), out var r) ? r : c.DefaultResolution;
+                    lines.Add($"  {c.Channel} {c.Label}: base \"{c.Base}\" | ArtGander \"{c.Local}\" | shop \"{c.Remote}\" -> {choice}");
+                }
+            }
+            File.AppendAllLines(Path.Combine(folder, $"{DateTime.Now:yyyy-MM}.log"), lines);
+        }
+        catch (IOException) { /* the log is a convenience */ }
+    }
+
     // ---- Orders ---------------------------------------------------------------------------------------
 
     /// <summary>
