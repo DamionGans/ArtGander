@@ -130,8 +130,36 @@ public class IntegrationTests
         var client = new ShopifyClient(Http(handler), auth);
 
         var ex = await Assert.ThrowsAsync<ShopifyException>(() => client.GetShopNameAsync());
-        Assert.Contains(".myshopify.com", ex.Message);
+        Assert.Contains("web page", ex.Message);
         Assert.False(ShopifyAuth.IsMyShopifyDomain(auth.ShopDomain));
+    }
+
+    [Fact]
+    public async Task A_store_that_does_not_exist_is_explained()
+    {
+        var handler = new FakeHandler((_, _) => new HttpResponseMessage(HttpStatusCode.NotFound)
+        {
+            Content = new StringContent("<!DOCTYPE html><html><head><title>Store unavailable</title></head></html>", Encoding.UTF8, "text/html"),
+        });
+        var auth = new ShopifyAuth(new HttpClient(handler), "hopes-art", "client", "secret");
+        var client = new ShopifyClient(Http(handler), auth);
+
+        var ex = await Assert.ThrowsAsync<ShopifyException>(() => client.GetShopNameAsync());
+        Assert.Contains("no Shopify store at \"hopes-art.myshopify.com\"", ex.Message);
+        Assert.Contains("Settings → Domains", ex.Message);
+    }
+
+    [Fact]
+    public async Task Login_errors_from_Shopify_are_explained()
+    {
+        var handler = new FakeHandler((_, _) => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("<!DOCTYPE html><html><head><title>400 - Oauth error application_cannot_be_found</title></head></html>", Encoding.UTF8, "text/html"),
+        });
+        var client = new ShopifyClient(Http(handler), new ShopifyAuth(new HttpClient(handler), "goose-shop.myshopify.com", "wrong", "secret"));
+
+        var ex = await Assert.ThrowsAsync<ShopifyException>(() => client.GetShopNameAsync());
+        Assert.Contains("doesn't know this Client ID", ex.Message);
     }
 
     [Fact]

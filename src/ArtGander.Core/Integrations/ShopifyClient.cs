@@ -35,10 +35,6 @@ public sealed class ShopifyAuth(HttpClient http, string shopDomain, string clien
     /// <summary>The API only works on the store's own ….myshopify.com address, not on a custom domain.</summary>
     public static bool IsMyShopifyDomain(string domain) => domain.EndsWith(".myshopify.com", StringComparison.OrdinalIgnoreCase);
 
-    internal const string WrongAddressHint =
-        "Shopify answered with a web page instead of data, so the store address is probably not right. Use the address that ends in .myshopify.com "
-        + "(Shopify admin → Settings → Domains), or paste the admin address (admin.shopify.com/store/…).";
-
     public async Task<string> GetTokenAsync(CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
@@ -57,7 +53,7 @@ public sealed class ShopifyAuth(HttpClient http, string shopDomain, string clien
             request.Headers.UserAgent.ParseAdd("ArtGander");
             using var response = await http.SendAsync(request, ct);
             var text = await response.Content.ReadAsStringAsync(ct);
-            if (LooksLikeHtml(text)) throw new ShopifyException(WrongAddressHint);
+            if (LooksLikeHtml(text)) throw new ShopifyException(HtmlAnswer(ShopDomain, response.StatusCode, text, response.RequestMessage?.RequestUri));
             if (!response.IsSuccessStatusCode)
                 throw new ShopifyException(TokenError(response.StatusCode, text));
             var node = JsonNode.Parse(text);
@@ -71,10 +67,43 @@ public sealed class ShopifyAuth(HttpClient http, string shopDomain, string clien
 
     internal static bool LooksLikeHtml(string text) => text.TrimStart().StartsWith('<');
 
+    /// <summary>Explains a web page where data was expected: usually there is no store at this address.</summary>
+    internal static string HtmlAnswer(string domain, System.Net.HttpStatusCode status, string html, Uri? finalUrl)
+    {
+        var title = System.Text.RegularExpressions.Regex.Match(html, @"<title[^>]*>\s*(.*?)\s*</title>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline).Groups[1].Value;
+        // Login problems come back as a web page titled e.g. "400 - Oauth error application_cannot_be_found".
+        var oauth = System.Text.RegularExpressions.Regex.Match(title, @"oauth error\s+(\w+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (oauth.Success) return OAuthAdvice(oauth.Groups[1].Value.ToLowerInvariant(), domain);
+        if (status == System.Net.HttpStatusCode.NotFound || title.Contains("unavailable", StringComparison.OrdinalIgnoreCase))
+            return $"there is no Shopify store at \"{domain}\". Shopify often gives a store a generated address (like a1b2c3-4d.myshopify.com) "
+                   + "that differs from the shop's name. Find it in Shopify admin → Settings → Domains, or copy the address of your Shopify admin "
+                   + "(admin.shopify.com/store/…) from the browser and paste it here.";
+        var moved = finalUrl is not null && !finalUrl.Host.Equals(domain, StringComparison.OrdinalIgnoreCase) ? $", after being sent on to {finalUrl.Host}" : "";
+        return $"Shopify answered with a web page (\"{title}\", {(int)status}{moved}) instead of data. Check the store address, and that the ArtGander app is installed on this store.";
+    }
+
+    /// <summary>What to do about a Shopify login (OAuth) error.</summary>
+    internal static string OAuthAdvice(string code, string domain) => code switch
+    {
+        "application_cannot_be_found" =>
+            "Shopify doesn't know this Client ID. Copy the Client ID from your app in the Shopify Dev Dashboard (dev.shopify.com → your app → Settings). "
+            + "An API key from an old custom app made in the Shopify admin doesn't work for this.",
+        "invalid_client" or "invalid_client_secret" or "invalid_request" =>
+            "the Client secret doesn't match the Client ID. Copy both again from the app's Settings in the Shopify Dev Dashboard.",
+        "shop_not_permitted" =>
+            $"this app may only be used on stores of its own organization. Create the app in the Dev Dashboard with the account that owns {domain}, and install it on that store.",
+        "app_not_installed" or "invalid_scope" =>
+            $"the app isn't installed on {domain} (or its access was not approved). In the Dev Dashboard, release a version with the access scopes and install the app on the store.",
+        _ => $"Shopify refused the login ({code}). Check the Client ID and secret, and that the app is installed on {domain}.",
+    };
+
     /// <summary>Turns the token endpoint's error into advice.</summary>
     private static string TokenError(System.Net.HttpStatusCode status, string text)
     {
         var detail = text.Length > 200 ? text[..200] : text;
+        foreach (var code in new[] { "application_cannot_be_found", "invalid_client", "shop_not_permitted", "app_not_installed" })
+            if (detail.Contains(code, StringComparison.OrdinalIgnoreCase)) return OAuthAdvice(code, "this store");
         if (detail.Contains("shop_not_permitted", StringComparison.OrdinalIgnoreCase))
             return "this app may only be used on stores of its own organization. Create the app in the Dev Dashboard with the account that owns the store, and install it on the store.";
         if (status is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Unauthorized)
@@ -103,7 +132,7 @@ public sealed class ShopifyClient(ApiHttp http, ShopifyAuth auth, string apiVers
                     new JsonObject { ["query"] = query, ["variables"] = variables ?? [] },
                     h => h.Add("X-Shopify-Access-Token", token), ct) ?? new JsonObject();
             }
-            catch (NotJsonException) { throw new ShopifyException(ShopifyAuth.WrongAddressHint); }
+            catch (NotJsonException ex) { throw new ShopifyException(ShopifyAuth.HtmlAnswer(auth.ShopDomain, ex.Status, ex.Html, null)); }
             catch (ApiException ex) when (ex.Status == System.Net.HttpStatusCode.NotFound)
             {
                 throw new ShopifyException($"API version \"{apiVersion}\" wasn't found. Leave the API version empty in Settings → Shops to use the default.");

@@ -29,7 +29,7 @@ public sealed class ApiHttp(HttpClient http, string userAgent = "ArtGander")
             return request;
         }, ct);
         if (string.IsNullOrWhiteSpace(text)) return null;
-        if (text.TrimStart().StartsWith('<')) throw new NotJsonException(new Uri(url).Host);
+        if (text.TrimStart().StartsWith('<')) throw new NotJsonException(new Uri(url).Host, System.Net.HttpStatusCode.OK, text);
         return JsonNode.Parse(text);
     }
 
@@ -64,6 +64,7 @@ public sealed class ApiHttp(HttpClient http, string userAgent = "ArtGander")
                     await Delay(wait < TimeSpan.Zero ? TimeSpan.Zero : wait > MaxWait ? MaxWait : wait, ct);
                     continue;
                 }
+                if (content.TrimStart().StartsWith('<')) throw new NotJsonException(request.RequestUri?.Host ?? "", response.StatusCode, content);
                 throw new ApiException(response.StatusCode, request.RequestUri?.Host ?? "", Shorten(content));
             }
         }
@@ -75,9 +76,11 @@ public sealed class ApiHttp(HttpClient http, string userAgent = "ArtGander")
 }
 
 /// <summary>The server answered with a web page instead of data (usually a wrong address).</summary>
-public sealed class NotJsonException(string host) : Exception($"{host} answered with a web page instead of data. Check the address.")
+public sealed class NotJsonException(string host, HttpStatusCode status, string html) : Exception($"{host} answered with a web page instead of data. Check the address.")
 {
     public string Host { get; } = host;
+    public HttpStatusCode Status { get; } = status;
+    public string Html { get; } = html.Length > 4000 ? html[..4000] : html;
 }
 
 public sealed class ApiException(HttpStatusCode status, string host, string body)
