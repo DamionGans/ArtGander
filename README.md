@@ -42,6 +42,12 @@ dotnet test --project tests/ArtGander.Core.Tests
 dotnet build src/ArtGander.App
 ```
 
+Local test build (tests plus the optimized app in `artifacts/local`; add `-Installer` for an installer, which needs Inno Setup 6 on Windows):
+
+```powershell
+./scripts/build-local.ps1 -Run
+```
+
 Architecture and how to add platforms (iOS, Android, Linux): [docs/architecture.md](docs/architecture.md).
 
-Releases: push a tag like `v0.2.0`. CI builds the Windows and macOS installers and attaches them to a GitHub Release.
+CI runs the tests on every push. The Windows and macOS installers are built only for release tags: push a tag like `v0.2.0` and CI attaches them to a GitHub Release.
