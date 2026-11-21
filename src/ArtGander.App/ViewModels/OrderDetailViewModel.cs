@@ -42,7 +42,7 @@ public sealed partial class OrderLineRow : ObservableObject
 /// Edits one order (<c>.artgander/orders/{order}.json</c>): its items, payment, production bill, shipping and tracking.
 /// Everything is edited on a copy and written together on Save.
 /// </summary>
-public sealed partial class OrderDetailViewModel(AppState app) : ObservableObject, IQueryAttributable
+public sealed partial class OrderDetailViewModel(AppState app, Core.Integrations.FulfillmentService fulfillment) : ObservableObject, IQueryAttributable
 {
     public static IReadOnlyList<OrderStatus> Statuses { get; } = Enum.GetValues<OrderStatus>();
     public static IReadOnlyList<string> CarrierOptions { get; } = Carriers.Known;
@@ -78,6 +78,32 @@ public sealed partial class OrderDetailViewModel(AppState app) : ObservableObjec
     public bool HasVariants => ProductVariants.Count > 0;
 
     public bool HasUnsavedChanges => ArtGanderJson.Serialize(Order) != _savedJson;
+
+    /// <summary>A Shopify order with items you ship yourselves can be marked as shipped in Shopify from here.</summary>
+    public bool CanMarkShipped => Order.Sources.Shopify is not null && Order.Lines.Any(l => l.Fulfillment == Fulfillment.Self && l.ShopifyLineId is not null);
+
+    [RelayCommand]
+    private void MarkShipped() => Ui.Fire(MarkShippedAsync);
+
+    private async Task MarkShippedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Order.TrackingCode)) { await Dialogs.AlertAsync("Tracking code missing", "Enter the delivery provider and tracking code first."); return; }
+        if (!await Dialogs.ConfirmAsync("Mark as shipped in Shopify?",
+                $"The items you ship yourselves are marked as shipped in Shopify with {Order.Carrier} {Order.TrackingCode}. Shopify emails the customer.", "Mark as shipped"))
+            return;
+        if (HasUnsavedChanges && !await TrySaveAsync()) return;
+        try
+        {
+            Notice = await fulfillment.MarkShippedAsync(app.Settings, Order, CancellationToken.None);
+            if (Order.Status is OrderStatus.Open or OrderStatus.Paid)
+            {
+                Order.Status = OrderStatus.Shipped;
+                Order.ShippedOn ??= DateOnly.FromDateTime(DateTime.Today);
+                await TrySaveAsync();
+            }
+        }
+        catch (Exception ex) { Notice = "Didn't work: " + ex.Message; }
+    }
     public bool IsLeaveConfirmed { get; set; }
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
@@ -95,6 +121,7 @@ public sealed partial class OrderDetailViewModel(AppState app) : ObservableObjec
         IsLeaveConfirmed = false;
         Order.PropertyChanged += (_, _) => UpdateSummary();
         OnPropertyChanged(nameof(SourceText));
+        OnPropertyChanged(nameof(CanMarkShipped));
 
         Products.Clear();
         foreach (var p in app.Catalog.All) Products.Add(p);

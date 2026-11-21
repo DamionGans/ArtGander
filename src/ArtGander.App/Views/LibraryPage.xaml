@@ -116,7 +116,7 @@
             <Label IsVisible="{Binding NoMatches}" Text="Nothing matches your filters." Style="{StaticResource Muted}" HorizontalOptions="Center" Margin="0,40" />
 
             <!-- ============ RASTER: rows that fill the width, every image in its own shape ============ -->
-            <CollectionView ItemsSource="{Binding RasterRows}" SelectionMode="None" IsVisible="{Binding IsRaster}">
+            <CollectionView ItemsSource="{Binding RasterSource}" SelectionMode="None" IsVisible="{Binding IsRaster}">
                 <CollectionView.Footer>
                     <BoxView HeightRequest="24" Color="Transparent" />
                 </CollectionView.Footer>
@@ -162,7 +162,7 @@
             </CollectionView>
 
             <!-- ============ LARGE ROWS: a fixed-width list, the whole preview visible ============ -->
-            <CollectionView ItemsSource="{Binding Items}" SelectionMode="None" IsVisible="{Binding IsRows}">
+            <CollectionView ItemsSource="{Binding RowsSource}" SelectionMode="None" IsVisible="{Binding IsRows}">
                 <CollectionView.Footer>
                     <BoxView HeightRequest="24" Color="Transparent" />
                 </CollectionView.Footer>
@@ -215,7 +215,7 @@
                     <Button Grid.Column="9" Text="Created" Command="{Binding SortColumnCommand}" CommandParameter="Created" Style="{StaticResource HeaderButton}" />
                     <Button Grid.Column="10" Text="Changed" Command="{Binding SortColumnCommand}" CommandParameter="Changed" Style="{StaticResource HeaderButton}" />
                 </Grid>
-                <CollectionView Grid.Row="1" ItemsSource="{Binding Items}" SelectionMode="None">
+                <CollectionView Grid.Row="1" ItemsSource="{Binding DetailsSource}" SelectionMode="None">
                     <CollectionView.Footer>
                         <BoxView HeightRequest="24" Color="Transparent" />
                     </CollectionView.Footer>

@@ -5,6 +5,7 @@
              xmlns:m="clr-namespace:ArtGander.Core.Model;assembly=ArtGander.Core"
              xmlns:s="clr-namespace:ArtGander.Core.Services;assembly=ArtGander.Core"
              xmlns:st="clr-namespace:ArtGander.Core.Storage;assembly=ArtGander.Core"
+             xmlns:ci="clr-namespace:ArtGander.Core.Integrations;assembly=ArtGander.Core"
              x:Class="ArtGander.App.Views.ProductDetailPage"
              x:DataType="vm:ProductDetailViewModel"
              Title="{Binding Product.Name}">
@@ -229,13 +230,43 @@
         <!-- ============ SHOPS ============ -->
         <ScrollView Grid.Row="3" IsVisible="{Binding IsChannels}">
             <VerticalStackLayout MaximumWidthRequest="900" HorizontalOptions="Start" Spacing="6" Padding="0,0,0,24">
+                <Border Style="{StaticResource Banner}" IsVisible="{Binding ShopStatus, Converter={StaticResource HasValue}}">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                        <ActivityIndicator IsRunning="{Binding IsWorking}" IsVisible="{Binding IsWorking}" HeightRequest="18" WidthRequest="18" />
+                        <Label Grid.Column="1" Text="{Binding ShopStatus}" />
+                    </Grid>
+                </Border>
+
                 <Label Text="Printify" Style="{StaticResource SectionTitle}" />
                 <Label Text="{Binding PrintifyText}" />
+                <VerticalStackLayout IsVisible="{Binding CanCreateOnPrintify}" Spacing="6">
+                    <Label Text="Create it in Printify by copying one of your Printify products (blueprint, print provider, sizes, placement) with this product's art. It's then published to your Shopify store."
+                           Style="{StaticResource Muted}" />
+                    <Button Text="Load my Printify products" Command="{Binding LoadTemplatesCommand}" HorizontalOptions="Start" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" IsVisible="{Binding HasTemplates}">
+                        <VerticalStackLayout>
+                            <Label Text="Template" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" ItemDisplayBinding="{Binding Title, x:DataType=ci:RemoteProduct}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Art file" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{Binding ArtFiles}" SelectedItem="{Binding SelectedArtFile}" ItemDisplayBinding="{Binding Label, x:DataType=vm:ArtFileOption}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Button Text="Create in Printify and publish" Command="{Binding CreateOnPrintifyCommand}" IsVisible="{Binding HasTemplates}" HorizontalOptions="Start" Style="{StaticResource TabButtonSelected}" />
+                </VerticalStackLayout>
+                <Button Text="Finish publishing to Shopify" Command="{Binding FinishPublishingCommand}" IsVisible="{Binding CanFinishPublishing}" HorizontalOptions="Start" />
                 <Label Text="Shopify" Style="{StaticResource SectionTitle}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Label Text="{Binding ShopifyText}" VerticalOptions="Center" />
                     <Button Grid.Column="1" Text="Open in shop" Command="{Binding OpenUrlCommand}" CommandParameter="{Binding ShopifyUrl}" IsVisible="{Binding HasShopifyUrl}" />
                 </Grid>
+                <VerticalStackLayout IsVisible="{Binding CanCreateOnShopify}" Spacing="6">
+                    <Label Text="You make and ship this product yourselves. Put it in your Shopify store as a draft, with its variants, prices and stock; add photos in Shopify, then set it to Active here and sync."
+                           Style="{StaticResource Muted}" />
+                    <Button Text="Create in Shopify" Command="{Binding CreateOnShopifyCommand}" HorizontalOptions="Start" Style="{StaticResource TabButtonSelected}" />
+                </VerticalStackLayout>
+                <Label Text="Changes to texts, tags, prices and stock are sent from the Shops page (Check products → Sync now)." Style="{StaticResource Muted}" Margin="0,6,0,0" />
 
                 <Grid ColumnDefinitions="*,Auto" Margin="0,12,0,0">
                     <VerticalStackLayout>

@@ -116,6 +116,7 @@
                         <Entry Text="{Binding Order.TrackingCode}" />
                         <Button Grid.Column="1" Text="Track" Command="{Binding TrackCommand}" />
                     </Grid>
+                    <Button Text="Mark as shipped in Shopify" Command="{Binding MarkShippedCommand}" IsVisible="{Binding CanMarkShipped}" HorizontalOptions="Start" Margin="0,6,0,0" />
                 </VerticalStackLayout>
             </Grid>
 

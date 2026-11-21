@@ -25,11 +25,12 @@ Download the latest installer from the repository's **Releases** page, or from t
 ## Features
 
 * **Art pieces and projects:** a project (e.g. a book) is a folder with its own files plus one folder per art piece, with page order, planned pieces, status, and bundle products; folders are recognized as piece or project automatically
-* Library grid with thumbnail tiles (portrait/square/landscape), search (also inside projects), type and collection filters, multi-select to track, add to a collection, make a project or move into one
+* Library in three views: a raster of images in their own shape (like an image search), large rows, and a sortable details table; search (also inside projects), type, collection and status filters, multi-select to track, add to a collection, make a project or move into one
 * Per piece: description, collections, tags, details of the original, notes
 * Files: add or drop files, which are copied in under the naming convention; rename a version, which renames the file; detects new, missing and misnamed files
-* Products: link any files to each product, with price, production cost and breakdown, margin, edition, stock, and listings per channel (Shopify, Printify, in person…)
-* Sales per piece, plus orders across pieces: what the customer paid (+ tax), production cost (+ tax), shipping cost (+ tax), delivery provider and tracking code (with a Track button), status, and an overview with revenue, costs, fees and profit
+* Products, managed on their own and linked to any art pieces and files: variants, prices, production cost and breakdown, margin, edition, stock, bundles
+* **Printify and Shopify**: import all products and orders; keep titles, descriptions, tags, prices and stock in sync from ArtGander with a per-field preview that never silently overwrites shop edits; create new products in Printify (published to Shopify) or, for things you make yourselves, directly in Shopify; mark self-shipped orders as shipped
+* Orders: Shopify and Printify orders combined into one; what the customer paid (+ tax), production cost (+ tax), shipping cost (+ tax), delivery provider and tracking code, who ships each item, and an overview with revenue, costs, fees and profit
 * Copyright registration tracking
 * Safe on network shares: atomic saves, conflict detection between computers, automatic format upgrades with backups
 

@@ -23,6 +23,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<ArtGander.Core.Integrations.ISecretStore, SecretStore>();
         builder.Services.AddSingleton<ArtGander.Core.Integrations.Connections>();
         builder.Services.AddSingleton<ArtGander.Core.Integrations.ImportService>();
+        builder.Services.AddSingleton<ArtGander.Core.Integrations.ProductCreator>();
+        builder.Services.AddSingleton<ArtGander.Core.Integrations.FulfillmentService>();
         builder.Services.AddSingleton<LibraryScanner>();
         builder.Services.AddSingleton<PieceService>();
 

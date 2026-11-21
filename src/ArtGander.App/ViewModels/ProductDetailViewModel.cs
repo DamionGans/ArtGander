@@ -81,7 +81,7 @@ public sealed partial class BundleRow : ObservableObject
 /// The editor for one product. Edits are made on a copy and written on Save; a product changed on another computer
 /// (or by a sync) in the meantime is never overwritten without asking.
 /// </summary>
-public sealed partial class ProductDetailViewModel(AppState app, ThumbnailService thumbs) : ObservableObject, IQueryAttributable
+public sealed partial class ProductDetailViewModel(AppState app, ThumbnailService thumbs, Core.Integrations.ProductCreator creator) : ObservableObject, IQueryAttributable
 {
     public static IReadOnlyList<ProductType> ProductTypes { get; } = Enum.GetValues<ProductType>();
     public static IReadOnlyList<ProductStatus> ProductStatuses { get; } = Enum.GetValues<ProductStatus>();
@@ -123,6 +123,18 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
     public bool HasShopifyUrl => ShopifyUrl is not null;
 
     public bool IsLeaveConfirmed { get; set; }
+
+    // ---- Putting it in the shops ----
+    public ObservableCollection<Core.Integrations.RemoteProduct> Templates { get; } = [];
+    [ObservableProperty] public partial Core.Integrations.RemoteProduct? SelectedTemplate { get; set; }
+    public ObservableCollection<ArtFileOption> ArtFiles { get; } = [];
+    [ObservableProperty] public partial ArtFileOption? SelectedArtFile { get; set; }
+    [ObservableProperty] public partial bool IsWorking { get; set; }
+    [ObservableProperty] public partial string ShopStatus { get; set; } = "";
+    public bool CanCreateOnPrintify => !IsNew && Product.Fulfillment == Fulfillment.Printify && !Product.IsOnPrintify;
+    public bool CanFinishPublishing => Product.Channels.Printify is { PublishPending: true } && !Product.IsOnShopify;
+    public bool CanCreateOnShopify => !IsNew && Product.Fulfillment != Fulfillment.Printify && !Product.IsOnShopify;
+    public bool HasTemplates => Templates.Count > 0;
 
     public bool HasUnsavedChanges => !IsReadOnly && (ArtGanderJson.Serialize(Product) != _savedJson || TagsText != _savedTags);
 
@@ -190,6 +202,92 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
         OnPropertyChanged(nameof(ShopifyText));
         OnPropertyChanged(nameof(ShopifyUrl));
         OnPropertyChanged(nameof(HasShopifyUrl));
+        OnPropertyChanged(nameof(CanCreateOnPrintify));
+        OnPropertyChanged(nameof(CanFinishPublishing));
+        OnPropertyChanged(nameof(CanCreateOnShopify));
+        RebuildArtFiles();
+    }
+
+    private void RebuildArtFiles()
+    {
+        ArtFiles.Clear();
+        var docs = app.Documents.ToDictionary(d => d.Piece.Id);
+        foreach (var f in Product.Files)
+            if (docs.TryGetValue(f.PieceId, out var d) && File.Exists(d.GetFilePath(f.FileName)))
+                ArtFiles.Add(new ArtFileOption($"{d.DisplayTitle} · {f.FileName}", d.GetFilePath(f.FileName)));
+        SelectedArtFile = ArtFiles.FirstOrDefault();
+    }
+
+    [RelayCommand]
+    private void LoadTemplates() => Ui.Fire(LoadTemplatesAsync);
+
+    private async Task LoadTemplatesAsync()
+    {
+        IsWorking = true;
+        ShopStatus = "Reading your Printify products…";
+        try
+        {
+            var templates = await creator.GetTemplatesAsync(app.Settings, CancellationToken.None);
+            Templates.Clear();
+            foreach (var t in templates.OrderBy(t => t.Title, NameRules.NaturalComparer)) Templates.Add(t);
+            SelectedTemplate = Templates.FirstOrDefault();
+            ShopStatus = "Pick the Printify product to copy (blueprint, print provider, sizes and placement). Your art replaces its image.";
+        }
+        catch (Exception ex) { ShopStatus = ex.Message; }
+        finally { IsWorking = false; OnPropertyChanged(nameof(HasTemplates)); }
+    }
+
+    [RelayCommand]
+    private void CreateOnPrintify() => Ui.Fire(CreateOnPrintifyAsync);
+
+    private async Task CreateOnPrintifyAsync()
+    {
+        if (SelectedTemplate is not { } template) { ShopStatus = "Load and pick a template product first."; return; }
+        if (SelectedArtFile is not { } art) { ShopStatus = "Link the art file to use on the Art tab first."; return; }
+        if (HasUnsavedChanges && !await TrySaveAsync()) return;
+        if (!await Dialogs.ConfirmAsync("Create in Printify and publish to Shopify?",
+                $"\"{Product.Name}\" is created in Printify like \"{template.Title}\", with {Path.GetFileName(art.Path)}, then published to your Shopify store.", "Create"))
+            return;
+        await ShopOpAsync(stored => creator.CreateOnPrintifyAsync(app.RootPath!, app.Settings, stored, template.Id, art.Path, CancellationToken.None));
+    }
+
+    [RelayCommand]
+    private void FinishPublishing() => Ui.Fire(() => ShopOpAsync(stored => creator.FinishPublishingAsync(app.Settings, stored, TimeSpan.FromSeconds(30), CancellationToken.None)));
+
+    [RelayCommand]
+    private void CreateOnShopify() => Ui.Fire(CreateOnShopifyAsync);
+
+    private async Task CreateOnShopifyAsync()
+    {
+        if (HasUnsavedChanges && !await TrySaveAsync()) return;
+        if (!await Dialogs.ConfirmAsync("Create in Shopify?",
+                $"\"{Product.Name}\" is created in your Shopify store as a draft, with its variants, prices and stock. You ship it yourselves.", "Create"))
+            return;
+        await ShopOpAsync(stored => creator.CreateOnShopifyAsync(app.RootPath!, app.Settings, stored, CancellationToken.None));
+    }
+
+    /// <summary>Runs a shop operation on the saved product, then shows the result.</summary>
+    private async Task ShopOpAsync(Func<Product, Task<string>> op)
+    {
+        if (app.Catalog.Find(Product.Id) is not { } stored) { ShopStatus = "Save the product first."; return; }
+        IsWorking = true;
+        ShopStatus = "Working… (this can take a minute)";
+        try
+        {
+            using (app.SuspendWatching()) ShopStatus = await op(stored);
+        }
+        catch (Exception ex) { ShopStatus = "Didn't work: " + ex.Message; }
+        finally
+        {
+            IsWorking = false;
+            await app.RefreshAsync();
+            if (app.Catalog.Find(Product.Id) is { } fresh)
+            {
+                var status = ShopStatus;
+                Load(fresh);
+                ShopStatus = status;
+            }
+        }
     }
 
     private void RebuildPieces()
@@ -381,3 +479,6 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
         await Shell.Current.GoToAsync("..");
     }
 }
+
+/// <summary>An art file that can be sent to Printify.</summary>
+public sealed record ArtFileOption(string Label, string Path);

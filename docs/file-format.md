@@ -9,9 +9,15 @@ ArtGander treats **the file system as the source of truth**. There is no central
 ```
 {Art folder}/
   .artgander/                            library-level files; always inside the art folder
-    library.json                         shared settings (currency, default copyright owner, collections, channels)
+    library.json                         shared settings (currency, collections, channels, which Printify/Shopify shops)
+    products/
+      Goose_poster_A3-9e46e898.json      one file per product; links to any art pieces and their files
     orders/
-      1001.json                          order details: payment, tax, production bill, shipping, tracking
+      1001.json                          one file per order: items, payment, tax, production bill, shipping, tracking
+    sync/
+      state.json                         when orders were last imported
+      log/2026-11.log                    what each sync did
+    sync.lock                            only while a computer is syncing or upgrading the library
   Goose On The Loose/                    one folder per art piece (the folder name comes from the title)
     .artgander.json                       all details about this piece
     .artgander.json.v1.bak                backup made automatically when the file format was upgraded
@@ -40,7 +46,7 @@ Name comparisons ignore case and Unicode normalization, because Windows and most
 * Files present on disk but missing from `.artgander.json` show up as **new files** to track (and optionally rename).
 * Entries in `.artgander.json` whose file is gone are flagged as **missing**.
 * Tracked files that don't follow the naming convention are flagged with a **Fix name** button.
-* Renaming a piece renames its folder, every file that follows the convention, and every product link, all as one operation with rollback.
+* Renaming a piece renames its folder, every file that follows the convention, and the product links to those files, all as one operation with rollback.
 * Thumbnails are cached in the app's local cache folder, never inside the art folder.
 
 ## Art pieces and projects
@@ -82,7 +88,7 @@ UTF-8 without BOM, LF line endings, 2-space indentation, camelCase property name
 
 ```jsonc
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "type": "piece",                      // piece | project
   "status": "finished",                 // idea | planned | inProgress | finished | published
   "id": "b766106e-…",                   // stable identity; survives renames
@@ -109,44 +115,65 @@ UTF-8 without BOM, LF line endings, 2-space indentation, camelCase property name
       "kind": "transparent",             // one of the library's file kinds (Settings); defaults: photo, scan, master, edit, transparent, print, mockup, other
       "notes": "", "addedAt": "…" }
   ],
-  "products": [
-    { "id": "9e46e898-…", "name": "A4 print",
-      "type": "selfPrint",               // original | selfPrint | printOnDemand | digital | other
-      "provider": "self", "variant": "A4",
-      "files": ["Goose_On_The_Loose-print-a4.pdf"],   // any files; independent of version names
-      "productionCost": 4.5, "price": 25, "currency": "EUR",
-      "costBreakdown": [{ "label": "paper", "amount": 1.2 }],
-      "editionSize": null, "stock": 10,
-      "listings": [{ "channel": "shopify", "url": "", "externalId": "", "price": 25, "status": "active" }],
-      "includes": [],                    // project bundles: [{ "pieceId": "…", "productId": "…", "quantity": 1 }]
-      "notes": "" }
-  ],
-  "sales": [
-    { "id": "…", "date": "2026-11-20", "orderRef": "#1001", "channel": "shopify",
-      "productId": "9e46e898-…", "quantity": 1, "unitPrice": 25, "fees": 1.2,
-      "unitCost": null,                  // null = use the product's production cost
-      "currency": "EUR", "customer": "", "notes": "" }
-  ],
   "notes": "",
   "pieceOrder": []                       // projects only: piece ids in order
 }
 ```
 
-**Bundle products** (projects only), such as a "Set of 3 prints", list the pieces they include. When a bundle has no production cost of its own,
-its cost is the sum of the included pieces' product costs.
+Products and sales are **not** stored in the piece (since format version 3): products have their own files and point to
+the pieces they show, so one product can show several pieces and a piece can be in many products.
 
-**Ordering a project or a piece:** order the whole project through one of the project's products (the printed book, a print set),
-or any single piece inside it through that piece's products. Sale lines are stored with whichever item owns the product.
-
-Orders that include several pieces are stored as one sale line per piece, all sharing the same `orderRef`. The Orders screen groups them back together.
-
-## `.artgander/orders/{order}.json`
-
-Order-level details that belong to no single piece. The file name is the order number as a label (`#1001` → `1001.json`). Every tax field is optional.
+## `.artgander/products/{name}-{id}.json`
 
 ```jsonc
 {
   "schemaVersion": 1,
+  "id": "9e46e898-…",
+  "name": "Goose poster A3",               // the title in the shop
+  "description": "<p>Honk</p>",
+  "tags": ["goose", "poster"],
+  "type": "printOnDemand",                 // printOnDemand (made and shipped by Printify) | selfPrint | handmade | original | digital | other
+  "status": "active",                      // draft | active | archived
+  "provider": "Printify", "variant": "A3 matte",
+  "pieces": ["b766106e-…"],                // the art pieces (or projects) it shows
+  "files": [{ "pieceId": "b766106e-…", "fileName": "Goose_On_The_Loose-transparent.png" }],
+  "price": 25, "productionCost": 11, "currency": "EUR",   // defaults for variants without their own
+  "costBreakdown": [{ "label": "paper", "amount": 1.2 }],
+  "editionSize": null, "stock": null,
+  "variants": [
+    { "key": "101", "title": "A3", "sku": "GP-A3", "price": 25, "cost": 11, "enabled": true, "stock": null,
+      "printifyVariantId": 101, "shopifyVariantId": "gid://shopify/ProductVariant/5001" }
+  ],
+  "listings": [{ "channel": "fair", "url": "", "externalId": "", "price": 25, "status": "active" }],  // other places, by hand
+  "includes": [],                          // bundles: [{ "pieceId": "…", "productId": "…", "quantity": 1 }]
+  "relations": [],                         // reserved: related products, e.g. { "productId": "…", "kind": "sameDesign" }
+  "channels": {
+    "printify": { "shopId": 42, "productId": "…", "blueprintId": 282, "printProviderId": 99, "publishPending": false,
+                  "remoteUpdatedAt": "…", "lastSyncedAt": "…", "base": { /* the values agreed at the last sync */ } },
+    "shopify":  { "productId": "gid://shopify/Product/777", "handle": "goose-poster", "url": "…", "inventoryLocationId": null,
+                  "remoteUpdatedAt": "…", "lastSyncedAt": "…",
+                  "base": { "title": "…", "description": "…", "tags": [], "status": "active",
+                            "variants": [{ "key": "101", "price": 25, "enabled": true, "stock": null }] } }
+  },
+  "notes": ""
+}
+```
+
+The `base` is what makes syncing safe: a field that differs from its base was changed on that side since the last sync.
+Changed only in ArtGander → sent to the shop. Changed only in the shop → shown so you can take it over. Changed on both
+sides → a conflict you decide; skipped conflicts keep their old base, so they come back. See [integrations.md](integrations.md).
+
+**Bundle products**, such as a "Set of 3 prints", list the products they include. When a bundle has no production cost of its own,
+"Use their cost" sums the included products' costs.
+
+## `.artgander/orders/{order}.json`
+
+One file per order. The file name is the order number as a label (`#1001` → `1001.json`). Every tax field is optional.
+Orders imported from Shopify and Printify are combined: a Printify order that fulfills a Shopify order becomes the same order.
+
+```jsonc
+{
+  "schemaVersion": 2,
   "id": "…",
   "orderRef": "#1001",
   "date": "2026-11-20",
@@ -163,7 +190,16 @@ Order-level details that belong to no single piece. The file name is the order n
   "carrier": "USPS",
   "trackingCode": "9400…",
   "shippedOn": "2026-11-21",
-  "notes": ""
+  "notes": "",
+  "lines": [
+    { "id": "…", "productId": "9e46e898-…", "variantKey": "101", "pieceId": null, "title": "Goose poster - A3", "sku": "GP-A3",
+      "quantity": 1, "unitPrice": 25, "unitCost": null, "fees": 0,
+      "fulfillment": "printify",           // printify | self (you ship it) | digital
+      "notes": "", "shopifyLineId": "gid://shopify/LineItem/1", "printifyLineId": null }
+  ],
+  "sources": { "shopify": { "id": "gid://shopify/Order/555", "name": "#1001", "updatedAt": "…", "importedAt": "…" },
+               "printify": { "id": "…", "name": "#1001", "updatedAt": "…", "importedAt": "…" } },
+  "importBase": { "customer": "Honk B.", "amountPaid": "30.00" }   // last imported value per field: your own edits are kept on re-import
 }
 ```
 
@@ -184,5 +220,6 @@ Profit per order = (amount paid − tax in it) − (production + production tax)
 |---|---|
 | 1 | First format. |
 | 2 | Projects: `type` (piece/project), `status`, `pieceOrder`, bundle `includes`. Upgrading sets `"type": "piece"` and `"status": "finished"`. ArtGander 0.1 opens version-2 files read-only, so update every computer. |
+| 3 | Products and orders get their own files. Upgrading moves each piece's `products` to `.artgander/products/` and its `sales` to order lines in `.artgander/orders/` (ids are kept; safe to interrupt and rerun), then removes them from the piece. ArtGander 0.2 opens version-3 files read-only, so update every computer. |
 
 To change the format: bump `CurrentSchema.Version`, add an `IMigration` with `FromVersion` = the previous version, register it in `MigrationCatalog.All`, and add a row to this table.

@@ -89,6 +89,11 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     public ObservableCollection<RasterRow> RasterRows { get; } = [];
 
+    // Only the visible list gets items: on Windows, changing the items of a hidden list view crashes the app.
+    public ObservableCollection<RasterRow>? RasterSource => IsRaster ? RasterRows : null;
+    public ObservableCollection<PieceItemViewModel>? RowsSource => IsRows ? Items : null;
+    public ObservableCollection<PieceItemViewModel>? DetailsSource => IsDetails ? Items : null;
+
     public const double RasterSpacing = 8;
     private IDispatcherTimer? _relayoutTimer;
 
@@ -99,6 +104,9 @@ public sealed partial class LibraryViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRows));
         OnPropertyChanged(nameof(IsDetails));
         RelayoutRaster();
+        OnPropertyChanged(nameof(RasterSource));
+        OnPropertyChanged(nameof(RowsSource));
+        OnPropertyChanged(nameof(DetailsSource));
     }
 
     partial void OnStatusFilterChanged(string value) => ApplyFilter();
@@ -179,7 +187,7 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// <summary>Packs the visible items into rows that fill the width, each tile in its image's own shape.</summary>
     private void RelayoutRaster()
     {
-        if (!IsRaster || AvailableWidth <= 0) { RasterRows.Clear(); return; }
+        if (!IsRaster || AvailableWidth <= 0) return;
         var items = Items.ToList();
         var rows = JustifiedLayout.Rows(items.Select(i => i.Aspect).ToList(), AvailableWidth, RasterHeight, RasterSpacing);
         RasterRows.Clear();

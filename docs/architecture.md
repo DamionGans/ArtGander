@@ -8,7 +8,8 @@ src/
     Schema/              JSON settings (source-generated, trim/AOT safe), schema version, migrations
     Storage/             Atomic, network-safe load/save; concurrent-edit detection
     Naming/              Cross-platform name rules and the {Name}-{version}.{ext} convention
-    Library/             Folder scanner (pieces and projects with their pieces), piece/project classifier, change watcher
+    Library/             Folder scanner (pieces and projects with their pieces), piece/project classifier, change watcher, image sizes and raster layout
+    Integrations/        Printify and Shopify clients, product/order import, field-by-field sync planner and runner, product creation
     Services/            Operations that touch disk (import, rename, track…) and sales reporting
   ArtGander.App/         .NET MAUI app: native WinUI 3 on Windows, Mac Catalyst (UIKit) on macOS
     Views/ ViewModels/   Pages and MVVM view models (CommunityToolkit.Mvvm)
