@@ -19,9 +19,18 @@
         </Grid>
 
         <Grid Grid.Row="1" ColumnDefinitions="*,180,180" ColumnSpacing="12">
-            <SearchBar Placeholder="Search piece, order #, customer, product, tracking…" Text="{Binding SearchText}" />
-            <Picker Grid.Column="1" ItemsSource="{x:Static vm:OrdersViewModel.Periods}" SelectedItem="{Binding Period}" />
-            <Picker Grid.Column="2" ItemsSource="{Binding ChannelFilters}" SelectedItem="{Binding Channel}" />
+            <VerticalStackLayout>
+                <Label Text="Search" Style="{StaticResource FieldLabel}" Margin="0" />
+                <SearchBar Placeholder="Piece, order #, customer, product, tracking…" Text="{Binding SearchText}" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="1">
+                <Label Text="Period" Style="{StaticResource FieldLabel}" Margin="0" />
+                <Picker ItemsSource="{x:Static vm:OrdersViewModel.Periods}" SelectedItem="{Binding Period}" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="2">
+                <Label Text="Channel" Style="{StaticResource FieldLabel}" Margin="0" />
+                <Picker ItemsSource="{Binding ChannelFilters}" SelectedItem="{Binding Channel}" />
+            </VerticalStackLayout>
         </Grid>
 
         <!-- Totals -->

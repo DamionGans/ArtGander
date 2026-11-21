@@ -52,7 +52,10 @@
                                                     </Label>
                                                 </VerticalStackLayout>
                                                 <Label Grid.Column="1" Text="{Binding Values}" VerticalOptions="Center" LineBreakMode="WordWrap" />
-                                                <Picker Grid.Column="2" ItemsSource="{x:Static vm:SyncChangeRow.Options}" SelectedItem="{Binding Choice}" VerticalOptions="Center" />
+                                                <VerticalStackLayout Grid.Column="2" VerticalOptions="Center">
+                                                    <Label Text="What to do" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                    <Picker ItemsSource="{x:Static vm:SyncChangeRow.Options}" SelectedItem="{Binding Choice}" />
+                                                </VerticalStackLayout>
                                             </Grid>
                                         </DataTemplate>
                                     </BindableLayout.ItemTemplate>
@@ -77,7 +80,10 @@
                     <DataTemplate x:DataType="vm:OrderImportRow">
                         <Border Style="{StaticResource Card}" Padding="10,6">
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                                <CheckBox IsChecked="{Binding Include}" VerticalOptions="Start" />
+                                <VerticalStackLayout VerticalOptions="Start">
+                                    <Label Text="Import" Style="{StaticResource FieldLabel}" Margin="0" HorizontalTextAlignment="Center" />
+                                    <CheckBox IsChecked="{Binding Include}" HorizontalOptions="Center" />
+                                </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" Spacing="2">
                                     <Label Text="{Binding Title}" FontAttributes="Bold" />
                                     <Label Text="{Binding Details}" Style="{StaticResource Muted}" />
@@ -113,13 +119,19 @@
                     <DataTemplate x:DataType="vm:ProductImportRow">
                         <Border Style="{StaticResource Card}" Padding="10,6">
                             <Grid ColumnDefinitions="Auto,*,300" ColumnSpacing="10">
-                                <CheckBox IsChecked="{Binding Include}" VerticalOptions="Center" />
+                                <VerticalStackLayout VerticalOptions="Center">
+                                    <Label Text="Import" Style="{StaticResource FieldLabel}" Margin="0" HorizontalTextAlignment="Center" />
+                                    <CheckBox IsChecked="{Binding Include}" HorizontalOptions="Center" />
+                                </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
                                     <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
                                     <Label Text="{Binding Details}" Style="{StaticResource Muted}" />
                                 </VerticalStackLayout>
-                                <Picker Grid.Column="2" Title="Art piece…" ItemsSource="{Binding Pieces}" SelectedItem="{Binding Piece}"
-                                        ItemDisplayBinding="{Binding DisplayTitle, x:DataType=st:ArtPieceDocument}" VerticalOptions="Center" />
+                                <VerticalStackLayout Grid.Column="2" VerticalOptions="Center">
+                                    <Label Text="Shows art piece" Style="{StaticResource FieldLabel}" Margin="0" />
+                                    <Picker Title="Choose an art piece…" ItemsSource="{Binding Pieces}" SelectedItem="{Binding Piece}"
+                                            ItemDisplayBinding="{Binding DisplayTitle, x:DataType=st:ArtPieceDocument}" />
+                                </VerticalStackLayout>
                             </Grid>
                         </Border>
                     </DataTemplate>

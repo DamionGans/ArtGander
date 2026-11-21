@@ -51,6 +51,7 @@
                     <Entry Text="{Binding PrintifyToken}" IsPassword="True" Placeholder="Paste the token (leave empty to keep the saved one)" />
                     <Button Grid.Column="1" Text="Connect" Command="{Binding ConnectPrintifyCommand}" />
                 </Grid>
+                <Label Text="Printify shop (the one connected to your Shopify store)" Style="{StaticResource FieldLabel}" IsVisible="{Binding HasShops}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasShops}">
                     <Picker ItemsSource="{Binding PrintifyShops}" SelectedItem="{Binding SelectedPrintifyShop}" ItemDisplayBinding="{Binding Title, x:DataType=ci:PrintifyShop}" />
                     <Button Grid.Column="1" Text="Use this shop" Command="{Binding UsePrintifyShopCommand}" />

@@ -42,7 +42,10 @@
 
         <VerticalStackLayout Grid.Row="1" Spacing="8" IsVisible="{Binding HasRoot}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <SearchBar Placeholder="Search titles, descriptions, tags, products… (also inside projects)" Text="{Binding SearchText}" />
+                <VerticalStackLayout>
+                    <Label Text="Search" Style="{StaticResource FieldLabel}" Margin="0" />
+                    <SearchBar Placeholder="Titles, descriptions, tags, products… (also inside projects)" Text="{Binding SearchText}" />
+                </VerticalStackLayout>
                 <!-- View switch: raster / large rows / details -->
                 <HorizontalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
                     <Button Text="Raster" Command="{Binding SetViewModeCommand}" CommandParameter="Raster">
@@ -63,9 +66,18 @@
                 </HorizontalStackLayout>
             </Grid>
             <HorizontalStackLayout Spacing="14">
-                <Picker WidthRequest="160" ItemsSource="{x:Static vm:LibraryViewModel.TypeFilters}" SelectedItem="{Binding TypeFilter}" />
-                <Picker WidthRequest="180" ItemsSource="{Binding CollectionFilters}" SelectedItem="{Binding SelectedCollection}" />
-                <Picker WidthRequest="140" ItemsSource="{x:Static vm:LibraryViewModel.StatusFilters}" SelectedItem="{Binding StatusFilter}" />
+                <HorizontalStackLayout Spacing="4">
+                    <Label Text="Show" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                    <Picker WidthRequest="160" ItemsSource="{x:Static vm:LibraryViewModel.TypeFilters}" SelectedItem="{Binding TypeFilter}" />
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="4">
+                    <Label Text="Collection" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                    <Picker WidthRequest="180" ItemsSource="{Binding CollectionFilters}" SelectedItem="{Binding SelectedCollection}" />
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="4">
+                    <Label Text="Status" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                    <Picker WidthRequest="140" ItemsSource="{x:Static vm:LibraryViewModel.StatusFilters}" SelectedItem="{Binding StatusFilter}" />
+                </HorizontalStackLayout>
                 <HorizontalStackLayout Spacing="4">
                     <Label Text="Sort" VerticalOptions="Center" Style="{StaticResource Muted}" />
                     <Picker WidthRequest="130" ItemsSource="{x:Static vm:LibraryViewModel.SortOptions}" SelectedItem="{Binding SortBy}" />

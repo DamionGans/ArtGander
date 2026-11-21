@@ -26,7 +26,7 @@
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                 <Button Text="‹ Back" Clicked="OnBackClicked" HorizontalOptions="Start" Padding="10,2" FontSize="13" />
-                <Label Text="PRODUCT" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource Pond}, Dark={StaticResource PondLight}}" />
+                <Label Text="PRODUCT NAME" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource Pond}, Dark={StaticResource PondLight}}" />
                 <Entry Text="{Binding Product.Name}" FontSize="22" FontAttributes="Bold" Placeholder="Product name, e.g. Goose poster A3" IsReadOnly="{Binding IsReadOnly}" />
             </VerticalStackLayout>
             <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
@@ -82,8 +82,9 @@
         <ScrollView Grid.Row="3" IsVisible="{Binding IsArt}">
             <VerticalStackLayout Spacing="10" Padding="0,0,0,24">
                 <Label Text="The art pieces this product shows, and the files it's made from (e.g. the transparent version)." Style="{StaticResource Muted}" />
+                <Label Text="Link an art piece to this product" Style="{StaticResource FieldLabel}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" MaximumWidthRequest="820" HorizontalOptions="Start">
-                    <Picker Title="Link an art piece…" ItemsSource="{Binding AvailablePieces}" SelectedItem="{Binding SelectedAvailablePiece}"
+                    <Picker Title="Choose an art piece…" ItemsSource="{Binding AvailablePieces}" SelectedItem="{Binding SelectedAvailablePiece}"
                             ItemDisplayBinding="{Binding DisplayTitle, x:DataType=st:ArtPieceDocument}" />
                     <Button Grid.Column="1" Text="Link" Command="{Binding LinkPieceCommand}" />
                 </Grid>
@@ -135,6 +136,11 @@
                     </VerticalStackLayout>
                     <Button Grid.Column="1" Text="Add product" Command="{Binding AddBundleItemCommand}" VerticalOptions="End" />
                     <Button Grid.Column="2" Text="Use their cost" Command="{Binding UseBundleCostCommand}" VerticalOptions="End" />
+                </Grid>
+                <Grid ColumnDefinitions="*,80,Auto" ColumnSpacing="8" MaximumWidthRequest="820" HorizontalOptions="Start">
+                    <Label Text="Included product" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="1" Text="Quantity" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="2" Text="" WidthRequest="40" />
                 </Grid>
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Bundle}" Spacing="4" MaximumWidthRequest="820" HorizontalOptions="Start">
                     <BindableLayout.ItemTemplate>
@@ -188,11 +194,11 @@
                     <Button Grid.Column="1" Text="Add variant" Command="{Binding AddVariantCommand}" VerticalOptions="End" />
                 </Grid>
                 <Grid ColumnDefinitions="Auto,2*,*,100,100,90,Auto" ColumnSpacing="8">
-                    <Label Text="On" Style="{StaticResource FieldLabel}" />
+                    <Label Text="On sale" Style="{StaticResource FieldLabel}" />
                     <Label Grid.Column="1" Text="Variant" Style="{StaticResource FieldLabel}" />
                     <Label Grid.Column="2" Text="SKU" Style="{StaticResource FieldLabel}" />
-                    <Label Grid.Column="3" Text="Price" Style="{StaticResource FieldLabel}" />
-                    <Label Grid.Column="4" Text="Cost" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="3" Text="Price (empty = default)" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="4" Text="Cost (empty = default)" Style="{StaticResource FieldLabel}" />
                     <Label Grid.Column="5" Text="Stock" Style="{StaticResource FieldLabel}" />
                 </Grid>
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Product.Variants}" Spacing="4">
@@ -215,6 +221,11 @@
                     <Label Text="Cost breakdown" Style="{StaticResource SectionTitle}" />
                     <Button Grid.Column="1" Text="Add cost line" Command="{Binding AddCostLineCommand}" VerticalOptions="End" />
                     <Button Grid.Column="2" Text="Use total as cost" Command="{Binding SumCostsCommand}" VerticalOptions="End" />
+                </Grid>
+                <Grid ColumnDefinitions="*,120,Auto" ColumnSpacing="8">
+                    <Label Text="What it's for" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="1" Text="Amount" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="2" Text="" WidthRequest="40" />
                 </Grid>
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Product.CostBreakdown}" Spacing="4">
                     <BindableLayout.ItemTemplate>
@@ -277,6 +288,12 @@
                         <Label Text="Where else it's offered, e.g. a fair, Etsy or a gallery." Style="{StaticResource Muted}" />
                     </VerticalStackLayout>
                     <Button Grid.Column="1" Text="Add listing" Command="{Binding AddListingCommand}" VerticalOptions="End" />
+                </Grid>
+                <Grid ColumnDefinitions="130,*,100,110,Auto,Auto" ColumnSpacing="8">
+                    <Label Text="Where" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="1" Text="Listing web address" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="2" Text="Price there" Style="{StaticResource FieldLabel}" />
+                    <Label Grid.Column="3" Text="Status" Style="{StaticResource FieldLabel}" />
                 </Grid>
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Product.Listings}" Spacing="4">
                     <BindableLayout.ItemTemplate>

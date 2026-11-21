@@ -49,6 +49,7 @@
                     <Label Text="PROJECT" IsVisible="{Binding IsProject}" FontSize="11" FontAttributes="Bold" VerticalOptions="Center"
                            TextColor="{AppThemeBinding Light={StaticResource Pond}, Dark={StaticResource PondLight}}" />
                 </HorizontalStackLayout>
+                <Label Text="Title" Style="{StaticResource FieldLabel}" Margin="0" />
                 <Entry Text="{Binding EditTitle}" FontSize="22" FontAttributes="Bold" Placeholder="Title" IsReadOnly="{Binding IsReadOnly}" />
                 <Label Text="{Binding FolderPreview}" Style="{StaticResource WarningText}" IsVisible="{Binding FolderPreview, Converter={StaticResource HasValue}}" />
                 <Label Text="{Binding FolderPath}" Style="{StaticResource Muted}" LineBreakMode="MiddleTruncation">
@@ -246,10 +247,16 @@
                             <Border Style="{StaticResource Banner}">
                                 <Grid ColumnDefinitions="*,200,160,Auto" ColumnSpacing="10">
                                     <Label Text="{Binding FileName}" VerticalOptions="Center" LineBreakMode="MiddleTruncation" />
-                                    <Entry Grid.Column="1" Text="{Binding Version}" Placeholder="version" />
-                                    <Picker Grid.Column="2" ItemsSource="{Binding FileKinds, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" SelectedItem="{Binding Kind, Converter={StaticResource KeepValue}}"
-                                            ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
-                                    <HorizontalStackLayout Grid.Column="3" Spacing="6">
+                                    <VerticalStackLayout Grid.Column="1">
+                                        <Label Text="Version (empty = cover)" Style="{StaticResource FieldLabel}" Margin="0" />
+                                        <Entry Text="{Binding Version}" Placeholder="e.g. master, transparent" />
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Grid.Column="2">
+                                        <Label Text="Kind" Style="{StaticResource FieldLabel}" Margin="0" />
+                                        <Picker ItemsSource="{Binding FileKinds, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" SelectedItem="{Binding Kind, Converter={StaticResource KeepValue}}"
+                                                ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                    </VerticalStackLayout>
+                                    <HorizontalStackLayout Grid.Column="3" Spacing="6" VerticalOptions="End">
                                         <Button Text="Track &amp; rename" Command="{Binding TrackFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
                                         <Button Text="Track as is" Command="{Binding TrackFileAsIsCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
                                     </HorizontalStackLayout>
@@ -269,8 +276,9 @@
                            Style="{StaticResource Muted}" VerticalOptions="Center" />
                     <Button Grid.Column="1" Text="New product" Command="{Binding NewProductCommand}" />
                 </Grid>
+                <Label Text="Link an existing product to this art piece" Style="{StaticResource FieldLabel}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <Picker Title="Link an existing product…" ItemsSource="{Binding AvailableProducts}" SelectedItem="{Binding SelectedAvailableProduct}"
+                    <Picker Title="Choose a product…" ItemsSource="{Binding AvailableProducts}" SelectedItem="{Binding SelectedAvailableProduct}"
                             ItemDisplayBinding="{Binding Name, x:DataType=m:Product}" />
                     <Button Grid.Column="1" Text="Link" Command="{Binding LinkProductCommand}" />
                 </Grid>

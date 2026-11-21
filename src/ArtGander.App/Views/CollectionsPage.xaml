@@ -29,8 +29,10 @@
                                 <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="16" />
                                 <Label Text="{Binding CountText}" Style="{StaticResource Muted}" />
                             </VerticalStackLayout>
-                            <Entry Grid.Column="1" Text="{Binding Description}" Placeholder="Description (optional)" VerticalOptions="Center"
-                                   Unfocused="OnDescriptionUnfocused" />
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                <Label Text="Description (optional)" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding Description}" Placeholder="What this collection is about" Unfocused="OnDescriptionUnfocused" />
+                            </VerticalStackLayout>
                             <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center">
                                 <Button Text="Show pieces" Command="{Binding ShowCommand, Source={RelativeSource AncestorType={x:Type vm:CollectionsViewModel}}, x:DataType=vm:CollectionsViewModel}" CommandParameter="{Binding .}" />
                                 <Button Text="Rename" Command="{Binding RenameCommand, Source={RelativeSource AncestorType={x:Type vm:CollectionsViewModel}}, x:DataType=vm:CollectionsViewModel}" CommandParameter="{Binding .}" />

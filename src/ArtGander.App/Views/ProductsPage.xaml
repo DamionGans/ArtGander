@@ -18,10 +18,22 @@
         </Grid>
 
         <Grid Grid.Row="1" ColumnDefinitions="*,170,150,150" ColumnSpacing="12">
-            <SearchBar Placeholder="Search name, art piece, tag, SKU…" Text="{Binding SearchText}" />
-            <Picker Grid.Column="1" Title="Type" ItemsSource="{x:Static vm:ProductsViewModel.TypeFilters}" SelectedItem="{Binding TypeFilter}" />
-            <Picker Grid.Column="2" Title="Status" ItemsSource="{x:Static vm:ProductsViewModel.StatusFilters}" SelectedItem="{Binding StatusFilter}" />
-            <Picker Grid.Column="3" Title="Online" ItemsSource="{x:Static vm:ProductsViewModel.ChannelFilters}" SelectedItem="{Binding ChannelFilter}" />
+            <VerticalStackLayout>
+                <Label Text="Search" Style="{StaticResource FieldLabel}" Margin="0" />
+                <SearchBar Placeholder="Name, art piece, tag, SKU…" Text="{Binding SearchText}" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="1">
+                <Label Text="Type" Style="{StaticResource FieldLabel}" Margin="0" />
+                <Picker ItemsSource="{x:Static vm:ProductsViewModel.TypeFilters}" SelectedItem="{Binding TypeFilter}" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="2">
+                <Label Text="Status" Style="{StaticResource FieldLabel}" Margin="0" />
+                <Picker ItemsSource="{x:Static vm:ProductsViewModel.StatusFilters}" SelectedItem="{Binding StatusFilter}" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="3">
+                <Label Text="In a shop" Style="{StaticResource FieldLabel}" Margin="0" />
+                <Picker ItemsSource="{x:Static vm:ProductsViewModel.ChannelFilters}" SelectedItem="{Binding ChannelFilter}" />
+            </VerticalStackLayout>
         </Grid>
 
         <Label Grid.Row="2" Text="{Binding SummaryText}" Style="{StaticResource Muted}" />
