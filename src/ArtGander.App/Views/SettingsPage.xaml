@@ -83,6 +83,40 @@
                 <Button Text="Forget the keys on this computer" Command="{Binding ForgetKeysCommand}" HorizontalOptions="Start" Margin="0,8,0,0" />
             </VerticalStackLayout>
 
+            <!-- Image protection: Mistcoat -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Image protection" Style="{StaticResource SectionTitle}" />
+                <Label Text="ArtGander uses Mistcoat to make copies of your images that are protected against AI training. Every image file of an art piece gets a Protect button (quick, with the preset below) and Options… (everything Mistcoat can do)."
+                       Style="{StaticResource Muted}" />
+                <Label Text="Mistcoat program on this computer (empty = look in the usual places)" Style="{StaticResource FieldLabel}" />
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                    <Entry Text="{Binding MistcoatPath}" Placeholder="e.g. C:\Program Files\Mistcoat\Mistcoat.exe" />
+                    <Button Grid.Column="1" Text="Use this" Command="{Binding SaveMistcoatPathCommand}" />
+                    <Button Grid.Column="2" Text="Choose…" Command="{Binding ChooseMistcoatCommand}" />
+                    <Button Grid.Column="3" Text="Find automatically" Command="{Binding FindMistcoatCommand}" />
+                </Grid>
+                <Label Text="{Binding MistcoatStatus}" Style="{StaticResource Muted}" />
+                <VerticalStackLayout IsVisible="{Binding HasRoot}" Spacing="4">
+                    <Label Text="Shared by all computers; saved with Save settings above." Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                    <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
+                        <VerticalStackLayout>
+                            <Label Text="Preset for quick protect" Style="{StaticResource FieldLabel}" />
+                            <Picker ItemsSource="{x:Static vm:SettingsViewModel.ProtectPresets}" SelectedItem="{Binding ProtectPreset}"
+                                    ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Credit embedded in protected files (empty = the piece's copyright owner)" Style="{StaticResource FieldLabel}" />
+                            <Entry Text="{Binding ProtectCredit}" Placeholder="Your name or studio name" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <HorizontalStackLayout Spacing="4">
+                        <CheckBox IsChecked="{Binding ProtectMetadata}" />
+                        <Label Text="Embed the &quot;do not train&quot; declaration, credit and copyright" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                    <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+
             <Label Text="About" Style="{StaticResource SectionTitle}" />
             <Label Text="{Binding Version}" />
             <Label Text="{Binding FormatVersion}" Style="{StaticResource Muted}" />

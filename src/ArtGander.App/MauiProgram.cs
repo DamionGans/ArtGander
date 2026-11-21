@@ -31,6 +31,7 @@ public static class MauiProgram
         // App services.
         builder.Services.AddSingleton<IPlatformServices, PlatformServices>();
         builder.Services.AddSingleton<ThumbnailService>();
+        builder.Services.AddSingleton<ProtectionService>();
         builder.Services.AddSingleton<AppState>();
         builder.Services.AddSingleton<AppShell>();
 

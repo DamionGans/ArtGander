@@ -22,9 +22,10 @@ public static class FileKind
     public const string Transparent = "transparent";
     public const string Print = "print";
     public const string Mockup = "mockup";
+    public const string Protected = "protected";
     public const string Other = "other";
 
-    public static IReadOnlyList<string> Defaults { get; } = [Cover, Photo, Scan, Master, Edit, Transparent, Print, Mockup, Other];
+    public static IReadOnlyList<string> Defaults { get; } = [Cover, Photo, Scan, Master, Edit, Transparent, Print, Mockup, Protected, Other];
 }
 
 [JsonConverter(typeof(CamelCaseEnumConverter<ItemType>))]

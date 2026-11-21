@@ -204,7 +204,7 @@
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="vm:FileRowViewModel">
                             <Border Style="{StaticResource Card}" Padding="8">
-                                <Grid ColumnDefinitions="64,*,160,Auto" ColumnSpacing="12">
+                                <Grid ColumnDefinitions="64,*,160,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
                                     <Border Style="{StaticResource Thumb}" HeightRequest="64" WidthRequest="64">
                                         <Image Source="{Binding Thumbnail}" Aspect="AspectFill" />
                                     </Border>
@@ -234,6 +234,103 @@
                                         <Button Text="Show" Command="{Binding RevealFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
                                         <Button Text="Remove" Command="{Binding UntrackFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
                                     </HorizontalStackLayout>
+
+                                    <!-- Protection against AI training (Mistcoat) -->
+                                    <VerticalStackLayout Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Spacing="6" IsVisible="{Binding CanProtect}">
+                                        <HorizontalStackLayout Spacing="6">
+                                            <Label Text="Protect against AI training" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                                            <Button Text="Protect" IsEnabled="{Binding CanStartProtect}" ToolTipProperties.Text="Make a protected copy with Mistcoat, using the preset from Settings"
+                                                    Command="{Binding QuickProtectCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                            <Button Text="Options…" IsEnabled="{Binding CanStartProtect}" ToolTipProperties.Text="Choose the strength, techniques, format and embedded credit"
+                                                    Command="{Binding ShowProtectOptionsCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                        </HorizontalStackLayout>
+                                        <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="8" IsVisible="{Binding IsProtecting}">
+                                            <ProgressBar Progress="{Binding ProtectFraction}" VerticalOptions="Center" />
+                                            <Label Grid.Column="1" Text="{Binding ProtectStage}" Style="{StaticResource Muted}" VerticalOptions="Center" LineBreakMode="TailTruncation" />
+                                            <Button Grid.Column="2" Text="Cancel" Command="{Binding CancelProtectCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                        </Grid>
+                                        <Label Text="{Binding ProtectMessage}" IsVisible="{Binding HasProtectMessage}" Style="{StaticResource Muted}" />
+
+                                        <!-- Advanced options -->
+                                        <ContentView IsVisible="{Binding HasAdvanced}">
+                                        <Border Style="{StaticResource Banner}" BindingContext="{Binding Advanced}" x:DataType="vm:ProtectOptionsViewModel" Padding="12">
+                                            <VerticalStackLayout Spacing="6">
+                                                <Grid ColumnDefinitions="160,*" ColumnSpacing="12">
+                                                    <VerticalStackLayout>
+                                                        <Label Text="Preset" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.Presets}" SelectedItem="{Binding Preset}"
+                                                                ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                                    </VerticalStackLayout>
+                                                    <Label Grid.Column="1" Text="{Binding PresetBlurb}" Style="{StaticResource Muted}" VerticalOptions="End" />
+                                                </Grid>
+                                                <Label Text="{Binding StrengthText, StringFormat='Strength: {0} of 100'}" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                <Slider Minimum="0" Maximum="100" Value="{Binding Strength}" MaximumWidthRequest="420" HorizontalOptions="Start" WidthRequest="420" />
+                                                <Label Text="Techniques" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Passes}">
+                                                    <BindableLayout.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:PassToggle">
+                                                            <HorizontalStackLayout Spacing="4">
+                                                                <CheckBox IsChecked="{Binding IsOn}" />
+                                                                <Label Text="{Binding Text}" VerticalOptions="Center" />
+                                                            </HorizontalStackLayout>
+                                                        </DataTemplate>
+                                                    </BindableLayout.ItemTemplate>
+                                                </VerticalStackLayout>
+                                                <HorizontalStackLayout Spacing="4">
+                                                    <CheckBox IsChecked="{Binding Harden}" />
+                                                    <Label Text="Harden against re-compression (slower, survives websites re-saving the image)" VerticalOptions="Center" />
+                                                </HorizontalStackLayout>
+                                                <HorizontalStackLayout Spacing="4">
+                                                    <CheckBox IsChecked="{Binding Measure}" />
+                                                    <Label Text="Measure how visible and durable the protection is (slower)" VerticalOptions="Center" />
+                                                </HorizontalStackLayout>
+                                                <HorizontalStackLayout Spacing="4">
+                                                    <CheckBox IsChecked="{Binding UseGpu}" />
+                                                    <Label Text="Use the graphics card when available" VerticalOptions="Center" />
+                                                </HorizontalStackLayout>
+                                                <HorizontalStackLayout Spacing="4">
+                                                    <CheckBox IsChecked="{Binding Metadata}" />
+                                                    <Label Text="Embed the &quot;do not train&quot; declaration, credit and copyright in the file" VerticalOptions="Center" />
+                                                </HorizontalStackLayout>
+                                                <Grid ColumnDefinitions="*,*" ColumnSpacing="12" IsVisible="{Binding Metadata}">
+                                                    <VerticalStackLayout>
+                                                        <Label Text="Credit (artist name)" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Entry Text="{Binding Credit}" />
+                                                    </VerticalStackLayout>
+                                                    <VerticalStackLayout Grid.Column="1">
+                                                        <Label Text="Copyright notice" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Entry Text="{Binding Copyright}" Placeholder="© 2026 Your name" />
+                                                    </VerticalStackLayout>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="180,180,*" ColumnSpacing="12">
+                                                    <VerticalStackLayout>
+                                                        <Label Text="File format" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.Formats}" SelectedItem="{Binding Format}" />
+                                                    </VerticalStackLayout>
+                                                    <VerticalStackLayout Grid.Column="1" IsVisible="{Binding IsJpeg}">
+                                                        <Label Text="{Binding JpegQuality, StringFormat='JPEG quality: {0:0}'}" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Slider Minimum="70" Maximum="100" Value="{Binding JpegQuality}" />
+                                                    </VerticalStackLayout>
+                                                    <VerticalStackLayout Grid.Column="2">
+                                                        <Label Text="Save as version" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Entry Text="{Binding Version}" Placeholder="protected" />
+                                                    </VerticalStackLayout>
+                                                </Grid>
+                                                <HorizontalStackLayout Spacing="8" Margin="0,6,0,0">
+                                                    <Button Text="Protect with these options" Style="{StaticResource TabButtonSelected}"
+                                                            Command="{Binding ProtectWithOptionsCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                                            CommandParameter="{Binding ., Source={RelativeSource AncestorType={x:Type vm:FileRowViewModel}}, x:DataType=vm:FileRowViewModel}" />
+                                                    <Button Text="Open in Mistcoat's window"
+                                                            Command="{Binding OpenInMistcoatCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                                            CommandParameter="{Binding ., Source={RelativeSource AncestorType={x:Type vm:FileRowViewModel}}, x:DataType=vm:FileRowViewModel}" />
+                                                    <Button Text="Close"
+                                                            Command="{Binding ShowProtectOptionsCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                                            CommandParameter="{Binding ., Source={RelativeSource AncestorType={x:Type vm:FileRowViewModel}}, x:DataType=vm:FileRowViewModel}" />
+                                                </HorizontalStackLayout>
+                                            </VerticalStackLayout>
+                                        </Border>
+                                        </ContentView>
+                                    </VerticalStackLayout>
                                 </Grid>
                             </Border>
                         </DataTemplate>

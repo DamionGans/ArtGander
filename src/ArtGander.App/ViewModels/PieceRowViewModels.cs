@@ -22,6 +22,32 @@ public sealed partial class FileRowViewModel(FileEntry entry, string fullPath, b
     public bool VersionChanged => FileNamer.Label(EditVersion) != Entry.Version;
     partial void OnEditVersionChanged(string value) => OnPropertyChanged(nameof(VersionChanged));
 
+    // ---- Protection with Mistcoat ----
+
+    /// <summary>An image Mistcoat can read.</summary>
+    public bool CanProtect => !IsMissing && Core.Integrations.MistcoatPasses.CanProtect(FullPath);
+
+    [ObservableProperty] public partial bool IsProtecting { get; set; }
+    [ObservableProperty] public partial string ProtectStage { get; set; } = "";
+    [ObservableProperty] public partial double ProtectFraction { get; set; }
+    /// <summary>The outcome of the last protection: what it looks like and how durable it is, or the error.</summary>
+    [ObservableProperty] public partial string ProtectMessage { get; set; } = "";
+    /// <summary>The advanced options, while they are open.</summary>
+    [ObservableProperty] public partial ProtectOptionsViewModel? Advanced { get; set; }
+
+    public bool HasAdvanced => Advanced is not null;
+    public bool CanStartProtect => CanProtect && !IsProtecting;
+    public bool HasProtectMessage => ProtectMessage.Length > 0 && !IsProtecting;
+    public CancellationTokenSource? ProtectCancel { get; set; }
+
+    partial void OnAdvancedChanged(ProtectOptionsViewModel? value) => OnPropertyChanged(nameof(HasAdvanced));
+    partial void OnIsProtectingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanStartProtect));
+        OnPropertyChanged(nameof(HasProtectMessage));
+    }
+    partial void OnProtectMessageChanged(string value) => OnPropertyChanged(nameof(HasProtectMessage));
+
     public string SizeText
     {
         get

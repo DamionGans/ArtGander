@@ -20,7 +20,8 @@ public sealed partial class PieceDetailViewModel(
     PieceService pieces,
     ProductCatalog catalog,
     IPlatformServices platform,
-    ThumbnailService thumbs) : ObservableObject, IQueryAttributable
+    ThumbnailService thumbs,
+    ProtectionService protection) : ObservableObject, IQueryAttributable
 {
     public static IReadOnlyList<OriginalStatus> OriginalStatuses { get; } = Enum.GetValues<OriginalStatus>();
     public static IReadOnlyList<CopyrightStatus> CopyrightStatuses { get; } = Enum.GetValues<CopyrightStatus>();
@@ -143,10 +144,12 @@ public sealed partial class PieceDetailViewModel(
     {
         if (Doc is null) return;
         var folder = PieceFolder.From(Doc.FolderPath, Doc);
+        var previous = Files.ToList();
         Files.Clear();
         foreach (var f in Doc.Piece.Files)
         {
             var row = new FileRowViewModel(f, Doc.GetFilePath(f.FileName), folder.MissingFiles.Contains(f.FileName), folder.MisnamedFiles.Contains(f.FileName));
+            CarryOver(previous.FirstOrDefault(p => string.Equals(p.Entry.FileName, f.FileName, StringComparison.OrdinalIgnoreCase)), row);
             Files.Add(row);
             _ = row.LoadThumbnailAsync(thumbs);
         }

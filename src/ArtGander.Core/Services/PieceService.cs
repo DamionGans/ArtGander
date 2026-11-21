@@ -86,7 +86,7 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
     /// Copies (or moves) an outside file into the piece folder under the naming convention and tracks it.
     /// </summary>
     /// <returns>The new file entry.</returns>
-    public FileEntry ImportFile(ArtPieceDocument doc, string sourcePath, string version, string kind, bool move = false)
+    public FileEntry ImportFile(ArtPieceDocument doc, string sourcePath, string version, string kind, bool move = false, string notes = "")
     {
         EnsureNotChangedElsewhere(doc);
         var ext = Path.GetExtension(sourcePath);
@@ -98,6 +98,7 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
         else File.Copy(sourcePath, target);
 
         var entry = NewEntry(fileName, label, kind);
+        entry.Notes = notes;
         doc.Piece.Files.Add(entry);
         try
         {

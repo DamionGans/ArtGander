@@ -10,11 +10,13 @@ public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AppState _app;
     private readonly IPlatformServices _platform;
+    private readonly ProtectionService _protection;
 
-    public SettingsViewModel(AppState app, IPlatformServices platform, ShopSettingsViewModel shops)
+    public SettingsViewModel(AppState app, IPlatformServices platform, ShopSettingsViewModel shops, ProtectionService protection)
     {
         _app = app;
         _platform = platform;
+        _protection = protection;
         Shops = shops;
         _app.LibraryChanged += (_, _) => Load();
         Load();
@@ -26,6 +28,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string Channels { get; set; } = "";
     [ObservableProperty] public partial string FileKinds { get; set; } = "";
     [ObservableProperty] public partial string? Status { get; set; }
+
+    // Image protection (Mistcoat)
+    public static IReadOnlyList<string> ProtectPresets => ArtGander.Core.Integrations.MistcoatPasses.Presets;
+    [ObservableProperty] public partial string MistcoatPath { get; set; } = "";
+    [ObservableProperty] public partial string MistcoatStatus { get; set; } = "";
+    [ObservableProperty] public partial string ProtectPreset { get; set; } = "balanced";
+    [ObservableProperty] public partial string ProtectCredit { get; set; } = "";
+    [ObservableProperty] public partial bool ProtectMetadata { get; set; } = true;
 
     public bool HasRoot => _app.HasRoot;
 
@@ -41,6 +51,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         DefaultCopyrightOwner = _app.Settings.DefaultCopyrightOwner;
         Channels = string.Join(", ", _app.Settings.Channels);
         FileKinds = string.Join(", ", _app.Settings.FileKinds);
+        ProtectPreset = _app.Settings.Protection.Preset;
+        ProtectCredit = _app.Settings.Protection.Credit;
+        ProtectMetadata = _app.Settings.Protection.Metadata;
+        MistcoatPath = _protection.ConfiguredPath;
+        UpdateMistcoatStatus();
         OnPropertyChanged(nameof(HasRoot));
     }
 
@@ -51,6 +66,43 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (path is null) return;
         await _app.OpenAsync(path);
         Load();
+    }
+
+    private void UpdateMistcoatStatus()
+    {
+        var found = ArtGander.Core.Integrations.MistcoatRunner.Find(_protection.ConfiguredPath);
+        MistcoatStatus = found is null
+            ? (string.IsNullOrWhiteSpace(_protection.ConfiguredPath)
+                ? "Mistcoat wasn't found on this computer. Install it, then choose Mistcoat.exe (Windows) or Mistcoat.app (Mac) here."
+                : "That program doesn't exist on this computer. Choose where Mistcoat is.")
+            : $"Using {found}";
+    }
+
+    /// <summary>Saves the Mistcoat location typed in the box (per computer) and checks it.</summary>
+    [RelayCommand]
+    private void SaveMistcoatPath()
+    {
+        _protection.ConfiguredPath = MistcoatPath;
+        UpdateMistcoatStatus();
+    }
+
+    [RelayCommand]
+    private async Task ChooseMistcoatAsync()
+    {
+        var start = OperatingSystem.IsWindows() ? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles) : "/Applications";
+        IReadOnlyList<string> picked;
+        try { picked = await _platform.PickFilesAsync(start); }
+        catch (Exception ex) { await Dialogs.ErrorAsync(ex); return; }
+        if (picked.Count == 0) return;
+        MistcoatPath = picked[0];
+        SaveMistcoatPath();
+    }
+
+    [RelayCommand]
+    private void FindMistcoat()
+    {
+        MistcoatPath = "";
+        SaveMistcoatPath();
     }
 
     [RelayCommand]
@@ -75,6 +127,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (kinds.Count == 0) kinds = [.. Core.Model.FileKind.Defaults];
         s.FileKinds.Clear();
         foreach (var k in kinds) s.FileKinds.Add(k);
+        s.Protection.Preset = ProtectPresets.Contains(ProtectPreset) ? ProtectPreset : "balanced";
+        s.Protection.Credit = ProtectCredit.Trim();
+        s.Protection.Metadata = ProtectMetadata;
         try
         {
             _app.SaveSettings();

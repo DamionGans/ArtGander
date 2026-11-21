@@ -23,6 +23,19 @@ public sealed partial class LibrarySettings : ModelBase
     /// the secret keys are stored per computer in the operating system's keychain.
     /// </summary>
     public IntegrationSettings Integrations { get; set; } = new();
+
+    /// <summary>Defaults for protecting images with Mistcoat (shared by all computers; where Mistcoat is installed is per computer).</summary>
+    public ProtectionSettings Protection { get; set; } = new();
+}
+
+public sealed partial class ProtectionSettings : ModelBase
+{
+    /// <summary>The Mistcoat preset quick protect uses: light, balanced, strong or maximum.</summary>
+    [ObservableProperty] public partial string Preset { get; set; } = "balanced";
+    /// <summary>The artist name embedded in protected files. Empty: the piece's copyright owner.</summary>
+    [ObservableProperty] public partial string Credit { get; set; } = "";
+    /// <summary>Embed the machine-readable "do not train" declaration.</summary>
+    [ObservableProperty] public partial bool Metadata { get; set; } = true;
 }
 
 public sealed partial class IntegrationSettings : ModelBase

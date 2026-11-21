@@ -30,6 +30,11 @@ public partial class PieceDetailPage : ContentPage
     public System.Windows.Input.ICommand TrackFileCommand => ViewModel.TrackFileCommand;
     public System.Windows.Input.ICommand TrackFileAsIsCommand => ViewModel.TrackFileAsIsCommand;
     public System.Windows.Input.ICommand OpenUrlCommand => ViewModel.OpenUrlCommand;
+    public System.Windows.Input.ICommand QuickProtectCommand => ViewModel.QuickProtectCommand;
+    public System.Windows.Input.ICommand ShowProtectOptionsCommand => ViewModel.ShowProtectOptionsCommand;
+    public System.Windows.Input.ICommand ProtectWithOptionsCommand => ViewModel.ProtectWithOptionsCommand;
+    public System.Windows.Input.ICommand CancelProtectCommand => ViewModel.CancelProtectCommand;
+    public System.Windows.Input.ICommand OpenInMistcoatCommand => ViewModel.OpenInMistcoatCommand;
 
     protected override void OnAppearing()
     {

@@ -154,6 +154,23 @@ public partial class AppShell
         {
             NavigateCommand.Execute("library"); await Task.Delay(1000);
             await ViewModels.LibraryViewModel.OpenPieceAsync(piece.FolderPath); await Task.Delay(2000); Log("8 piece open");
+            if (CurrentPage is PieceDetailPage pp && pp.ViewModel.Files.FirstOrDefault(f => f.CanProtect) is { } row)
+            {
+                var vm = pp.ViewModel;
+                vm.Tab = "files"; await Task.Delay(500);
+                vm.ShowProtectOptionsCommand.Execute(row); await Task.Delay(800);
+                Log($"8a options open={row.Advanced is not null} preset={row.Advanced?.Preset} passes={row.Advanced?.Passes.Count(p => p.IsOn)}");
+                vm.ShowProtectOptionsCommand.Execute(row); await Task.Delay(300);
+                if (Environment.GetEnvironmentVariable("MISTCOAT_EXE") is { Length: > 0 })
+                {
+                    var name = row.Entry.FileName;
+                    vm.QuickProtectCommand.Execute(row);
+                    for (var i = 0; i < 240 && !(vm.Files.FirstOrDefault(f => f.Entry.FileName == name) is { IsProtecting: false, ProtectMessage.Length: > 0 }); i++)
+                        await Task.Delay(500);
+                    var done = vm.Files.FirstOrDefault(f => f.Entry.FileName == name);
+                    Log($"8b quick protect: {done?.ProtectMessage} files={string.Join("|", vm.Files.Select(f => $"{f.Entry.FileName}:{f.Entry.Kind}"))}");
+                }
+            }
             await GoToAsync(".."); await Task.Delay(1000);
         }
         if (app.Catalog.All.FirstOrDefault() is { } product)
