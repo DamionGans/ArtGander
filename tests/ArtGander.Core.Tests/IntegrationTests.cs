@@ -107,6 +107,33 @@ public class IntegrationTests
         Assert.Contains("/admin/api/" + ShopifyClient.DefaultApiVersion + "/graphql.json", handler.Requests[1].Url);
     }
 
+    [Theory]
+    [InlineData("goose-shop", "goose-shop.myshopify.com")]
+    [InlineData("Goose-Shop.myshopify.com", "goose-shop.myshopify.com")]
+    [InlineData("https://goose-shop.myshopify.com/admin/products", "goose-shop.myshopify.com")]
+    [InlineData("https://admin.shopify.com/store/goose-shop/products?x=1", "goose-shop.myshopify.com")]
+    [InlineData("admin.shopify.com/store/goose-shop", "goose-shop.myshopify.com")]
+    [InlineData("www.mygooseshop.com", "www.mygooseshop.com")]
+    public void Store_addresses_are_understood(string input, string expected)
+    {
+        Assert.Equal(expected, ShopifyAuth.NormalizeDomain(input));
+    }
+
+    [Fact]
+    public async Task A_web_page_instead_of_data_explains_the_store_address()
+    {
+        var handler = new FakeHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("<!DOCTYPE html><html><body>Goose Shop</body></html>", Encoding.UTF8, "text/html"),
+        });
+        var auth = new ShopifyAuth(new HttpClient(handler), "www.mygooseshop.com", "client", "secret");
+        var client = new ShopifyClient(Http(handler), auth);
+
+        var ex = await Assert.ThrowsAsync<ShopifyException>(() => client.GetShopNameAsync());
+        Assert.Contains(".myshopify.com", ex.Message);
+        Assert.False(ShopifyAuth.IsMyShopifyDomain(auth.ShopDomain));
+    }
+
     [Fact]
     public void Printify_and_Shopify_products_become_one_product_linked_to_its_piece()
     {

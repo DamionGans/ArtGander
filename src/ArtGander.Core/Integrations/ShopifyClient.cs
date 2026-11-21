@@ -16,14 +16,28 @@ public sealed class ShopifyAuth(HttpClient http, string shopDomain, string clien
 
     public string ShopDomain { get; } = NormalizeDomain(shopDomain);
 
-    /// <summary>"my-shop", "my-shop.myshopify.com" or "https://my-shop.myshopify.com/admin" → "my-shop.myshopify.com".</summary>
+    /// <summary>
+    /// "my-shop", "my-shop.myshopify.com", "https://my-shop.myshopify.com/admin" or the admin address
+    /// "https://admin.shopify.com/store/my-shop" → "my-shop.myshopify.com".
+    /// </summary>
     public static string NormalizeDomain(string input)
     {
         var s = input.Trim().ToLowerInvariant();
-        if (s.Contains("://", StringComparison.Ordinal)) s = new Uri(s).Host;
-        s = s.Split('/')[0];
-        return s.Length == 0 || s.Contains('.') ? s : s + ".myshopify.com";
+        if (s.Contains("://", StringComparison.Ordinal)) s = s[(s.IndexOf("://", StringComparison.Ordinal) + 3)..];
+        var parts = s.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return "";
+        // The Shopify admin address names the store after /store/.
+        if (parts[0] == "admin.shopify.com" && parts.Length >= 3 && parts[1] == "store") return parts[2] + ".myshopify.com";
+        var host = parts[0];
+        return host.Contains('.') ? host : host + ".myshopify.com";
     }
+
+    /// <summary>The API only works on the store's own ….myshopify.com address, not on a custom domain.</summary>
+    public static bool IsMyShopifyDomain(string domain) => domain.EndsWith(".myshopify.com", StringComparison.OrdinalIgnoreCase);
+
+    internal const string WrongAddressHint =
+        "Shopify answered with a web page instead of data, so the store address is probably not right. Use the address that ends in .myshopify.com "
+        + "(Shopify admin → Settings → Domains), or paste the admin address (admin.shopify.com/store/…).";
 
     public async Task<string> GetTokenAsync(CancellationToken ct)
     {
@@ -43,8 +57,9 @@ public sealed class ShopifyAuth(HttpClient http, string shopDomain, string clien
             request.Headers.UserAgent.ParseAdd("ArtGander");
             using var response = await http.SendAsync(request, ct);
             var text = await response.Content.ReadAsStringAsync(ct);
+            if (LooksLikeHtml(text)) throw new ShopifyException(WrongAddressHint);
             if (!response.IsSuccessStatusCode)
-                throw new ApiException(response.StatusCode, ShopDomain, text.Length > 300 ? text[..300] : text);
+                throw new ShopifyException(TokenError(response.StatusCode, text));
             var node = JsonNode.Parse(text);
             _token = node.Str("access_token");
             var seconds = node.Long("expires_in") ?? 86399;
@@ -52,6 +67,19 @@ public sealed class ShopifyAuth(HttpClient http, string shopDomain, string clien
             return _token;
         }
         finally { _gate.Release(); }
+    }
+
+    internal static bool LooksLikeHtml(string text) => text.TrimStart().StartsWith('<');
+
+    /// <summary>Turns the token endpoint's error into advice.</summary>
+    private static string TokenError(System.Net.HttpStatusCode status, string text)
+    {
+        var detail = text.Length > 200 ? text[..200] : text;
+        if (detail.Contains("shop_not_permitted", StringComparison.OrdinalIgnoreCase))
+            return "this app may only be used on stores of its own organization. Create the app in the Dev Dashboard with the account that owns the store, and install it on the store.";
+        if (status is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Unauthorized)
+            return $"the Client ID or Client secret wasn't accepted, or the app isn't installed on this store ({(int)status}: {detail}).";
+        return $"{(int)status} {status}: {detail}";
     }
 }
 
@@ -68,9 +96,18 @@ public sealed class ShopifyClient(ApiHttp http, ShopifyAuth auth, string apiVers
         for (var attempt = 1; ; attempt++)
         {
             var token = await auth.GetTokenAsync(ct);
-            var node = await http.SendJsonAsync(HttpMethod.Post, $"https://{auth.ShopDomain}/admin/api/{apiVersion}/graphql.json",
-                new JsonObject { ["query"] = query, ["variables"] = variables ?? [] },
-                h => h.Add("X-Shopify-Access-Token", token), ct) ?? new JsonObject();
+            JsonNode node;
+            try
+            {
+                node = await http.SendJsonAsync(HttpMethod.Post, $"https://{auth.ShopDomain}/admin/api/{apiVersion}/graphql.json",
+                    new JsonObject { ["query"] = query, ["variables"] = variables ?? [] },
+                    h => h.Add("X-Shopify-Access-Token", token), ct) ?? new JsonObject();
+            }
+            catch (NotJsonException) { throw new ShopifyException(ShopifyAuth.WrongAddressHint); }
+            catch (ApiException ex) when (ex.Status == System.Net.HttpStatusCode.NotFound)
+            {
+                throw new ShopifyException($"API version \"{apiVersion}\" wasn't found. Leave the API version empty in Settings → Shops to use the default.");
+            }
 
             if (node["errors"] is JsonArray errors && errors.Count > 0)
             {

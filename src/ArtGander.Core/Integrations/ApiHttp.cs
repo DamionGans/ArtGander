@@ -28,7 +28,9 @@ public sealed class ApiHttp(HttpClient http, string userAgent = "ArtGander")
             if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
             return request;
         }, ct);
-        return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (text.TrimStart().StartsWith('<')) throw new NotJsonException(new Uri(url).Host);
+        return JsonNode.Parse(text);
     }
 
     public async Task<string> SendAsync(Func<HttpRequestMessage> makeRequest, CancellationToken ct)
@@ -70,6 +72,12 @@ public sealed class ApiHttp(HttpClient http, string userAgent = "ArtGander")
     private static TimeSpan Backoff(int attempt) => TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, attempt)));
 
     private static string Shorten(string s) => s.Length > 400 ? s[..400] + "…" : s;
+}
+
+/// <summary>The server answered with a web page instead of data (usually a wrong address).</summary>
+public sealed class NotJsonException(string host) : Exception($"{host} answered with a web page instead of data. Check the address.")
+{
+    public string Host { get; } = host;
 }
 
 public sealed class ApiException(HttpStatusCode status, string host, string body)

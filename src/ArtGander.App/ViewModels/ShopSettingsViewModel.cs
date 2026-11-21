@@ -105,6 +105,12 @@ public sealed partial class ShopSettingsViewModel(AppState app, Connections conn
             s.ShopifyClientId = ShopifyClientId.Trim();
             s.ShopifyApiVersion = ShopifyApiVersion.Trim();
             ShopifyDomain = s.ShopifyDomain;
+            if (s.ShopifyDomain.Length > 0 && !ShopifyAuth.IsMyShopifyDomain(s.ShopifyDomain))
+            {
+                ShopifyStatus = $"\"{s.ShopifyDomain}\" looks like your shop's own web address. The connection needs the address that ends in .myshopify.com "
+                                + "(Shopify admin → Settings → Domains), or paste the admin address (admin.shopify.com/store/…).";
+                return;
+            }
             if (ShopifyClientSecret.Trim().Length > 0)
             {
                 await connections.Secrets.SetAsync(SecretKeys.ShopifyClientSecret, ShopifyClientSecret.Trim());
