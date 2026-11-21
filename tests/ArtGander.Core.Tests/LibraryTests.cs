@@ -10,6 +10,13 @@ public class LibraryTests
     private readonly ArtPieceStore _store = new();
     private PieceService Service => new(_store);
 
+    private (PieceService Service, ProductCatalog Catalog) WithCatalog(TempLibrary lib)
+    {
+        var catalog = new ProductCatalog();
+        catalog.SetLoaded(lib.Root, []);
+        return (new PieceService(_store, catalog), catalog);
+    }
+
     [Fact]
     public void Creates_piece_folder_with_details_file()
     {
@@ -85,13 +92,14 @@ public class LibraryTests
         lib.WriteFile("Goose/scan from phone.jpg");
         var doc = Service.AdoptFolder(Path.Combine(lib.Root, "Goose"));
         var entry = doc.Piece.Files.Single();
-        doc.Piece.Products.Add(new Product { Name = "Print", Files = { entry.FileName } });
-        _store.Save(doc);
+        var (service, catalog) = WithCatalog(lib);
+        var product = new Product { Name = "Print", Pieces = [doc.Piece.Id], Files = { new ProductFile { PieceId = doc.Piece.Id, FileName = entry.FileName } } };
+        catalog.Save(product);
 
-        Service.ApplyConvention(doc, entry);
+        service.ApplyConvention(doc, entry);
 
         Assert.Equal("Goose-scan-from-phone.jpg", entry.FileName);
-        Assert.Equal(["Goose-scan-from-phone.jpg"], doc.Piece.Products[0].Files);
+        Assert.Equal("Goose-scan-from-phone.jpg", Assert.Single(Records.Products.LoadAll(lib.Root)).Files[0].FileName);
         Assert.True(File.Exists(Path.Combine(doc.FolderPath, "Goose-scan-from-phone.jpg")));
     }
 
@@ -154,17 +162,17 @@ public class LibraryTests
         var doc = Service.CreatePiece(lib.Root, "Goose");
         var src = lib.WriteFile("in/a.png");
         var file = Service.ImportFile(doc, src, "transparent", FileKind.Transparent);
-        doc.Piece.Products.Add(new Product { Name = "Sticker", Files = { file.FileName } });
-        _store.Save(doc);
+        var (service, catalog) = WithCatalog(lib);
+        catalog.Save(new Product { Name = "Sticker", Files = { new ProductFile { PieceId = doc.Piece.Id, FileName = file.FileName } } });
 
-        Service.RenamePiece(doc, "Goose On The Loose");
+        service.RenamePiece(doc, "Goose On The Loose");
 
         Assert.Equal(Path.Combine(lib.Root, "Goose On The Loose"), doc.FolderPath);
         Assert.False(Directory.Exists(Path.Combine(lib.Root, "Goose")));
         Assert.True(File.Exists(Path.Combine(doc.FolderPath, "Goose_On_The_Loose-transparent.png")));
         var reloaded = _store.Load(doc.FolderPath);
         Assert.Equal("Goose On The Loose", reloaded.Piece.Title);
-        Assert.Equal(["Goose_On_The_Loose-transparent.png"], reloaded.Piece.Products[0].Files);
+        Assert.Equal("Goose_On_The_Loose-transparent.png", Assert.Single(Records.Products.LoadAll(lib.Root)).Files[0].FileName);
     }
 
     [Fact]
@@ -197,12 +205,14 @@ public class LibraryTests
         using var lib = new TempLibrary();
         var doc = Service.CreatePiece(lib.Root, "Goose");
         var entry = Service.ImportFile(doc, lib.WriteFile("in/a.png"), "master", FileKind.Master);
-        doc.Piece.Products.Add(new Product { Files = { entry.FileName } });
+        var (service, catalog) = WithCatalog(lib);
+        var product = new Product { Files = { new ProductFile { PieceId = doc.Piece.Id, FileName = entry.FileName } } };
+        catalog.Save(product);
 
-        Service.UntrackFile(doc, entry);
+        service.UntrackFile(doc, entry);
 
         Assert.Empty(doc.Piece.Files);
-        Assert.Empty(doc.Piece.Products[0].Files);
+        Assert.Empty(product.Files);
         Assert.True(File.Exists(Path.Combine(doc.FolderPath, "Goose-master.png")));
     }
 
@@ -212,13 +222,14 @@ public class LibraryTests
         using var lib = new TempLibrary();
         var a = Service.CreatePiece(lib.Root, "A");
         var b = Service.CreatePiece(lib.Root, "B");
-        var pa = new Product { Name = "Print", ProductionCost = 3 };
-        a.Piece.Products.Add(pa);
-        a.Piece.Sales.Add(new Sale { OrderRef = "#1001", ProductId = pa.Id, Quantity = 2, UnitPrice = 20, Fees = 1 });
-        b.Piece.Sales.Add(new Sale { OrderRef = "#1001", Quantity = 1, UnitPrice = 10, UnitCost = 2 });
-        b.Piece.Sales.Add(new Sale { Quantity = 1, UnitPrice = 5 });
+        var pa = new Product { Name = "Print", ProductionCost = 3, Pieces = [a.Piece.Id] };
+        var o1 = new Order { OrderRef = "#1001" };
+        o1.Lines.Add(new OrderLine { ProductId = pa.Id, Quantity = 2, UnitPrice = 20, Fees = 1 });
+        o1.Lines.Add(new OrderLine { PieceId = b.Piece.Id, Quantity = 1, UnitPrice = 10, UnitCost = 2 });
+        var o2 = new Order();
+        o2.Lines.Add(new OrderLine { PieceId = b.Piece.Id, Quantity = 1, UnitPrice = 5 });
 
-        var orders = SalesReport.Orders(SalesReport.Rows([a, b]));
+        var orders = SalesReport.Orders([o1, o2], [pa], [a, b]);
         var totals = SalesReport.Totals(orders);
 
         Assert.Equal(2, orders.Count);

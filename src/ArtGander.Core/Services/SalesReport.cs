@@ -3,119 +3,120 @@ using ArtGander.Core.Storage;
 
 namespace ArtGander.Core.Services;
 
-/// <summary>A sale line flattened together with its piece and product, for library-wide order views.</summary>
+/// <summary>An order line together with its product and art piece, for overviews.</summary>
 public sealed record SaleRow(
-    ArtPieceDocument Piece,
-    Sale Sale,
+    Order Order,
+    OrderLine Line,
     Product? Product,
+    ArtPieceDocument? Piece,
     decimal? BundleUnitCost = null)
 {
-    /// <summary>The piece or project title; pieces inside a project read "Project › Piece".</summary>
-    public string PieceTitle => Piece.DisplayTitle;
-    public string ProductName => Product?.Name ?? "(unknown product)";
-    public decimal Revenue => Sale.UnitPrice * Sale.Quantity;
-    public decimal Cost => (Sale.UnitCost ?? Product?.ProductionCost ?? BundleUnitCost ?? 0m) * Sale.Quantity;
-    public decimal Profit => Revenue - Cost - Sale.Fees;
+    public DateOnly Date => Order.Date;
+
+    /// <summary>What was sold: the product, or the line's own title for items that aren't linked to a product.</summary>
+    public string ProductName => Product?.Name is { Length: > 0 } n ? n : Line.Title is { Length: > 0 } t ? t : "(unknown item)";
+
+    /// <summary>The art piece or project; pieces inside a project read "Project › Piece".</summary>
+    public string PieceTitle => Piece?.DisplayTitle ?? "";
+
+    /// <summary>"Product (Piece)" or just the product.</summary>
+    public string ItemTitle => PieceTitle.Length > 0 && !string.Equals(PieceTitle, ProductName, StringComparison.CurrentCultureIgnoreCase)
+        ? $"{ProductName} ({PieceTitle})"
+        : ProductName;
+
+    public decimal Revenue => Line.UnitPrice * Line.Quantity;
+    public decimal UnitCost => Line.UnitCost ?? Product?.CostOf(Product.FindVariant(Line.VariantKey)) ?? BundleUnitCost ?? 0m;
+    public decimal Cost => UnitCost * Line.Quantity;
+    public decimal Profit => Revenue - Cost - Line.Fees;
 }
 
 /// <summary>
-/// An order: every sale line across the library that shares an order reference, plus the optional order details
-/// (what the customer paid, shipping, tracking…).
+/// An order with its lines.
 /// <para>
 /// Money logic, kept simple:
 /// revenue = what the customer paid (or the sum of item prices) minus the tax in it;
 /// costs = production (the actual bill, or the products' costs) + production tax + shipping + shipping tax + fees.
 /// </para>
 /// </summary>
-public sealed record OrderSummary(string OrderRef, DateOnly Date, string Channel, IReadOnlyList<SaleRow> Lines, Order? Details)
+public sealed record OrderSummary(Order Details, IReadOnlyList<SaleRow> Lines)
 {
-    public int Items => Lines.Sum(l => l.Sale.Quantity);
+    public string OrderRef => Details.OrderRef;
+    public DateOnly Date => Details.Date;
+    public string Channel => Details.Channel;
+
+    public int Items => Lines.Sum(l => l.Line.Quantity);
     public decimal ItemsTotal => Lines.Sum(l => l.Revenue);
 
     /// <summary>What the customer paid, including tax and any shipping they were charged.</summary>
-    public decimal Paid => Details?.AmountPaid ?? ItemsTotal;
-    public decimal TaxCollected => Details?.AmountPaidTax ?? 0;
+    public decimal Paid => Details.AmountPaid ?? ItemsTotal;
+    public decimal TaxCollected => Details.AmountPaidTax ?? 0;
     public decimal Revenue => Paid - TaxCollected;
 
-    public decimal ProductionCost => (Details?.ProductionCost ?? Lines.Sum(l => l.Cost)) + (Details?.ProductionTax ?? 0);
-    public decimal Shipping => (Details?.ShippingCost ?? 0) + (Details?.ShippingTax ?? 0);
-    public decimal Fees => Lines.Sum(l => l.Sale.Fees);
+    public decimal ProductionCost => (Details.ProductionCost ?? Lines.Sum(l => l.Cost)) + (Details.ProductionTax ?? 0);
+    public decimal Shipping => (Details.ShippingCost ?? 0) + (Details.ShippingTax ?? 0);
+    public decimal Fees => Lines.Sum(l => l.Line.Fees);
     public decimal Cost => ProductionCost;
     public decimal CostAndFees => ProductionCost + Shipping + Fees;
     public decimal Profit => Revenue - CostAndFees;
 
-    public string Customer => Details?.Customer is { Length: > 0 } c ? c
-        : Lines.Select(l => l.Sale.Customer).FirstOrDefault(c => !string.IsNullOrWhiteSpace(c)) ?? "";
-    public string PiecesText => Lines.Count == 0 ? "(no items yet)" : string.Join(", ", Lines.Select(l => l.PieceTitle).Distinct());
-    public OrderStatus? Status => Details?.Status;
+    public string Customer => Details.Customer;
+    public string PiecesText => Lines.Count == 0 ? "(no items yet)" : string.Join(", ", Lines.Select(l => l.ItemTitle).Distinct());
+    public OrderStatus? Status => Details.Status;
     public string TrackingText => Details is { TrackingCode.Length: > 0 } d ? $"{d.Carrier} {d.TrackingCode}".Trim() : "";
+
+    /// <summary>True when some items are made and shipped by you rather than Printify.</summary>
+    public bool ShipYourself => Lines.Any(l => l.Line.Fulfillment == Fulfillment.Self);
 }
 
 public sealed record SalesTotals(int Orders, int Items, decimal Revenue, decimal Cost, decimal Shipping, decimal Fees, decimal TaxCollected, decimal Profit);
 
 public static class SalesReport
 {
-    private const string NoRef = "\0no-ref:";
-
-    public static IReadOnlyList<SaleRow> Rows(IEnumerable<ArtPieceDocument> docs)
+    /// <summary>Every order with its lines resolved to products and pieces.</summary>
+    public static IReadOnlyList<OrderSummary> Orders(IEnumerable<Order> orders, IReadOnlyCollection<Product> products, IEnumerable<ArtPieceDocument> docs)
     {
-        var all = docs.ToList();
-        var byId = PieceLookup(all.Select(d => d.Piece));
-        return all.SelectMany(d => d.Piece.Sales.Select(s =>
-            {
-                var product = d.Piece.FindProduct(s.ProductId);
-                return new SaleRow(d, s, product, product is null ? null : BundleCost(product, byId));
-            }))
-            .OrderByDescending(r => r.Sale.Date)
+        var productsById = products.GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
+        var piecesById = docs.GroupBy(d => d.Piece.Id).ToDictionary(g => g.Key, g => g.First());
+        return orders
+            .Select(o => new OrderSummary(o, o.Lines.Select(l => Row(o, l, productsById, piecesById)).ToList()))
+            .OrderByDescending(o => o.Date)
+            .ThenByDescending(o => o.OrderRef, Naming.NameRules.NaturalComparer)
             .ToList();
     }
 
-    public static IReadOnlyDictionary<Guid, ArtPiece> PieceLookup(IEnumerable<ArtPiece> pieces) =>
-        pieces.GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
+    /// <summary>Every order line, newest first.</summary>
+    public static IReadOnlyList<SaleRow> Rows(IEnumerable<Order> orders, IReadOnlyCollection<Product> products, IEnumerable<ArtPieceDocument> docs) =>
+        Orders(orders, products, docs).SelectMany(o => o.Lines).ToList();
+
+    /// <summary>The lines that sold this art piece: directly, or through a product that shows it.</summary>
+    public static IReadOnlyList<SaleRow> ForPiece(IEnumerable<SaleRow> rows, Guid pieceId) =>
+        rows.Where(r => r.Line.PieceId == pieceId || (r.Product is { } p && ProductCatalog.Shows(p, pieceId))).ToList();
+
+    public static IReadOnlyList<SaleRow> ForProduct(IEnumerable<SaleRow> rows, Guid productId) =>
+        rows.Where(r => r.Line.ProductId == productId).ToList();
+
+    private static SaleRow Row(Order order, OrderLine line, Dictionary<Guid, Product> products, Dictionary<Guid, ArtPieceDocument> pieces)
+    {
+        var product = line.ProductId is { } id && products.TryGetValue(id, out var p) ? p : null;
+        var pieceId = line.PieceId ?? (product?.Pieces.Count == 1 ? product.Pieces[0] : null);
+        var piece = pieceId is { } pid && pieces.TryGetValue(pid, out var d) ? d : null;
+        return new SaleRow(order, line, product, piece, product is null ? null : BundleCost(product, products));
+    }
 
     /// <summary>
-    /// The production cost of a bundle product (e.g. "Set of 3 prints"): the sum of the included pieces' product
-    /// costs times their quantity. Null when the product isn't a bundle.
+    /// The production cost of a bundle product (e.g. "Set of 3 prints"): the sum of the included products' costs
+    /// times their quantity. Null when the product isn't a bundle.
     /// </summary>
-    public static decimal? BundleCost(Product product, IReadOnlyDictionary<Guid, ArtPiece> piecesById)
+    public static decimal? BundleCost(Product product, IReadOnlyDictionary<Guid, Product> productsById)
     {
         if (product.Includes.Count == 0) return null;
         decimal total = 0;
         foreach (var item in product.Includes)
         {
-            if (!piecesById.TryGetValue(item.PieceId, out var piece)) continue;
-            var cost = piece.FindProduct(item.ProductId)?.ProductionCost ?? 0;
+            var cost = item.ProductId is { } id && productsById.TryGetValue(id, out var included) ? included.ProductionCost ?? 0 : 0;
             total += cost * Math.Max(1, item.Quantity);
         }
         return total;
-    }
-
-    /// <summary>
-    /// Groups sale lines into orders and attaches order details by reference. Lines without an order reference
-    /// each count as their own order. Order details without any lines still show up (e.g. a newly created order).
-    /// </summary>
-    public static IReadOnlyList<OrderSummary> Orders(IEnumerable<SaleRow> rows, IEnumerable<Order>? details = null)
-    {
-        var byRef = (details ?? [])
-            .Where(o => !string.IsNullOrWhiteSpace(o.OrderRef))
-            .GroupBy(o => o.OrderRef.Trim(), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-        var result = rows
-            .GroupBy(r => string.IsNullOrWhiteSpace(r.Sale.OrderRef) ? NoRef + r.Sale.Id : r.Sale.OrderRef.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Select(g =>
-            {
-                var lines = g.ToList();
-                var first = lines.MinBy(l => l.Sale.Date)!;
-                var orderRef = g.Key.StartsWith(NoRef, StringComparison.Ordinal) ? "" : g.Key;
-                var order = orderRef.Length > 0 && byRef.Remove(orderRef, out var o) ? o : null;
-                return new OrderSummary(orderRef, order?.Date ?? first.Sale.Date, order?.Channel ?? first.Sale.Channel, lines, order);
-            })
-            .ToList();
-
-        // Orders that have details but no items (yet).
-        result.AddRange(byRef.Values.Select(o => new OrderSummary(o.OrderRef, o.Date, o.Channel, [], o)));
-        return result.OrderByDescending(o => o.Date).ToList();
     }
 
     public static SalesTotals Totals(IReadOnlyCollection<OrderSummary> orders) => new(

@@ -12,12 +12,11 @@ public class OrderTests
         using var lib = new TempLibrary();
         var service = new PieceService(new ArtPieceStore());
         var a = service.CreatePiece(lib.Root, "A");
-        var product = new Product { Name = "Mug", ProductionCost = 6 };
-        a.Piece.Products.Add(product);
-        a.Piece.Sales.Add(new Sale { OrderRef = "#2001", ProductId = product.Id, Quantity = 1, UnitPrice = 22, Fees = 1 });
+        var product = new Product { Name = "Mug", ProductionCost = 6, Pieces = [a.Piece.Id] };
 
         var details = new Order
         {
+            Lines = { new OrderLine { ProductId = product.Id, Quantity = 1, UnitPrice = 22, Fees = 1 } },
             OrderRef = "#2001",
             AmountPaid = 30, AmountPaidTax = 5,      // customer paid 30 incl. 5 tax (and shipping)
             ProductionCost = 8, ProductionTax = 1.6m, // actual Printify bill
@@ -25,7 +24,7 @@ public class OrderTests
             Carrier = "USPS", TrackingCode = "9400 1",
         };
 
-        var order = SalesReport.Orders(SalesReport.Rows([a]), [details]).Single();
+        var order = SalesReport.Orders([details], [product], [a]).Single();
 
         Assert.Equal(25, order.Revenue);
         Assert.Equal(9.6m, order.ProductionCost);
@@ -39,11 +38,10 @@ public class OrderTests
     {
         using var lib = new TempLibrary();
         var a = new PieceService(new ArtPieceStore()).CreatePiece(lib.Root, "A");
-        var product = new Product { ProductionCost = 6 };
-        a.Piece.Products.Add(product);
-        a.Piece.Sales.Add(new Sale { OrderRef = "#1", ProductId = product.Id, Quantity = 2, UnitPrice = 20 });
+        var product = new Product { ProductionCost = 6, Pieces = [a.Piece.Id] };
+        var details = new Order { OrderRef = "#1", Lines = { new OrderLine { ProductId = product.Id, Quantity = 2, UnitPrice = 20 } } };
 
-        var order = SalesReport.Orders(SalesReport.Rows([a])).Single();
+        var order = SalesReport.Orders([details], [product], [a]).Single();
         Assert.Equal(40, order.Revenue);
         Assert.Equal(12, order.ProductionCost);
         Assert.Equal(28, order.Profit);
@@ -52,7 +50,7 @@ public class OrderTests
     [Fact]
     public void Orders_without_items_still_show()
     {
-        var orders = SalesReport.Orders([], [new Order { OrderRef = "#9", AmountPaid = 10 }]);
+        var orders = SalesReport.Orders([new Order { OrderRef = "#9", AmountPaid = 10 }], [], []);
         Assert.Equal(10, Assert.Single(orders).Revenue);
     }
 
@@ -61,17 +59,16 @@ public class OrderTests
     {
         using var lib = new TempLibrary();
         var order = new Order { OrderRef = "#1001", Carrier = "PostNL", TrackingCode = "3S123" };
-        OrderStore.Save(lib.Root, order);
+        Records.Orders.Save(lib.Root, order);
         Assert.True(File.Exists(Path.Combine(lib.Root, ".artgander", "orders", "1001.json")));
 
-        var previous = OrderStore.FileNameFor(order);
         order.OrderRef = "#1002";
-        OrderStore.Save(lib.Root, order, previous);
+        Records.Orders.Save(lib.Root, order);
 
-        var loaded = Assert.Single(OrderStore.LoadAll(lib.Root));
+        var loaded = Assert.Single(Records.Orders.LoadAll(lib.Root));
         Assert.Equal("#1002", loaded.OrderRef);
         Assert.Equal("PostNL", loaded.Carrier);
-        Assert.Throws<IOException>(() => OrderStore.Save(lib.Root, new Order { OrderRef = "#1002" }));
+        Assert.Throws<IOException>(() => Records.Orders.Save(lib.Root, new Order { OrderRef = "#1002" }));
     }
 
     [Fact]

@@ -186,5 +186,5 @@ public class ArtPieceFileException(string path, string message, Exception? inner
     public string FilePath { get; } = path;
 }
 
-public sealed class ConcurrentEditException(string path)
-    : ArtPieceFileException(path, "This art piece was changed on another computer after you opened it.");
+public sealed class ConcurrentEditException(string path, string? message = null)
+    : ArtPieceFileException(path, message ?? "This art piece was changed on another computer after you opened it.");

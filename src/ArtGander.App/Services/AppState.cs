@@ -1,5 +1,6 @@
 using ArtGander.Core.Library;
 using ArtGander.Core.Model;
+using ArtGander.Core.Services;
 using ArtGander.Core.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -13,12 +14,15 @@ public sealed partial class AppState : ObservableObject, IDisposable
 {
     private const string RootPreferenceKey = "artRoot";
     private readonly LibraryScanner _scanner;
+    private readonly ArtPieceStore _store;
     private LibraryWatcher? _watcher;
     private CancellationTokenSource? _scanCts;
 
-    public AppState(LibraryScanner scanner)
+    public AppState(LibraryScanner scanner, ArtPieceStore store, ProductCatalog catalog)
     {
         _scanner = scanner;
+        _store = store;
+        Catalog = catalog;
         // ARTGANDER_LIBRARY opens a specific art folder for this run only, without changing the saved choice.
         // Useful for testing against sample data.
         var overridePath = Environment.GetEnvironmentVariable("ARTGANDER_LIBRARY");
@@ -29,8 +33,18 @@ public sealed partial class AppState : ObservableObject, IDisposable
     [ObservableProperty] public partial IReadOnlyList<PieceFolder> Pieces { get; private set; } = [];
     [ObservableProperty] public partial LibrarySettings Settings { get; private set; } = new();
     [ObservableProperty] public partial IReadOnlyList<Order> Orders { get; private set; } = [];
+
+    /// <summary>The library's products (shared with the services).</summary>
+    public ProductCatalog Catalog { get; }
+
+    /// <summary>Every order with its lines resolved to products and pieces.</summary>
+    [ObservableProperty] public partial IReadOnlyList<OrderSummary> OrderSummaries { get; private set; } = [];
+
+    /// <summary>Every order line, newest first.</summary>
+    public IReadOnlyList<SaleRow> SaleRows => OrderSummaries.SelectMany(o => o.Lines).ToList();
     [ObservableProperty] public partial bool IsScanning { get; private set; }
     [ObservableProperty] public partial string? LastError { get; private set; }
+    [ObservableProperty] public partial string? MigrationNotice { get; set; }
 
     public bool HasRoot => !string.IsNullOrEmpty(RootPath) && Directory.Exists(RootPath);
 
@@ -88,12 +102,28 @@ public sealed partial class AppState : ObservableObject, IDisposable
         try
         {
             var root = RootPath!;
-            var (pieces, settings, orders) = await Task.Run(() => (_scanner.Scan(root, cts.Token), LibrarySettingsStore.Load(root), OrderStore.LoadAll(root)), cts.Token);
+            var (pieces, settings, orders, products, migration) = await Task.Run(() =>
+            {
+                var scanned = _scanner.Scan(root, cts.Token);
+                var docs = scanned.SelectMany(p => p.Children.Prepend(p)).Select(p => p.Document).OfType<ArtPieceDocument>().ToList();
+                LibraryMigrator.Result? migrated = null;
+                if (LibraryMigrator.NeedsMigration(docs))
+                {
+                    // Products and sales from ArtGander 0.2 move to their own files (once).
+                    using (SuspendWatching()) migrated = LibraryMigrator.Run(root, docs, _store, Catalog);
+                }
+                return (scanned, LibrarySettingsStore.Load(root), Records.Orders.LoadAll(root), Records.Products.LoadAll(root), migrated);
+            }, cts.Token);
             if (cts.IsCancellationRequested) return;
             Pieces = pieces;
             if (_watcher is not null) _watcher.ProjectFolders = pieces.Where(p => p.IsProject).Select(p => p.FolderPath).ToList();
             Settings = settings;
             Orders = orders;
+            Catalog.SetLoaded(root, products);
+            OrderSummaries = SalesReport.Orders(orders, Catalog.All, Documents);
+            if (migration is { Pieces: > 0 } or { Problems.Count: > 0 })
+                MigrationNotice = $"Upgraded the library: {migration.Products} products and {migration.OrderLines} sold items moved to their own files."
+                    + (migration.Problems.Count > 0 ? " Not done yet (will retry): " + string.Join("; ", migration.Problems) : "");
             LastError = null;
             LibraryChanged?.Invoke(this, EventArgs.Empty);
         }

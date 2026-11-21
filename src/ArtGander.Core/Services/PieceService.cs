@@ -8,9 +8,12 @@ namespace ArtGander.Core.Services;
 /// Every operation that changes files or folders in the art library. Each one keeps the folder,
 /// the file names and <c>artgander.json</c> consistent with each other.
 /// </summary>
-public sealed partial class PieceService(ArtPieceStore store)
+public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? catalog = null)
 {
     public ArtPieceStore Store => store;
+
+    /// <summary>The library's products. File renames are passed on to the products that use the file.</summary>
+    public ProductCatalog? Catalog => catalog;
 
     /// <summary>Creates <c>{parent}/{Title}/.artgander.json</c>. The parent is the art folder, or a project folder.</summary>
     public ArtPieceDocument CreatePiece(string parentPath, string title, LibrarySettings? defaults = null,
@@ -124,9 +127,8 @@ public sealed partial class PieceService(ArtPieceStore store)
     public void UntrackFile(ArtPieceDocument doc, FileEntry entry)
     {
         doc.Piece.Files.Remove(entry);
-        foreach (var p in doc.Piece.Products)
-            RemoveName(p.Files, entry.FileName);
         store.Save(doc);
+        catalog?.ReplaceFileReference(doc.Piece.Id, entry.FileName, null);
     }
 
     /// <summary>Changes a file's version label. The file on disk is renamed and product links are updated.</summary>
@@ -178,7 +180,7 @@ public sealed partial class PieceService(ArtPieceStore store)
                     if (!File.Exists(from) || from == to) continue;
                     MoveSafe(from, to);
                     done.Add((from, to, entry, entry.FileName));
-                    ReplaceFileReferences(doc.Piece, entry.FileName, newName);
+                    ReplaceFileReferences(doc.Piece.Id, entry.FileName, newName);
                     entry.FileName = newName;
                 }
                 MoveDirectorySafe(oldFolder, newFolder);
@@ -200,7 +202,7 @@ public sealed partial class PieceService(ArtPieceStore store)
             {
                 var (from, to, entry, oldName) = done[i];
                 try { MoveSafe(to, from); } catch (IOException) { }
-                ReplaceFileReferences(doc.Piece, entry.FileName, oldName);
+                ReplaceFileReferences(doc.Piece.Id, entry.FileName, oldName);
                 entry.FileName = oldName;
             }
             doc.Piece.Title = oldTitle;
@@ -230,25 +232,13 @@ public sealed partial class PieceService(ArtPieceStore store)
 
         var from = doc.GetFilePath(entry.FileName);
         if (File.Exists(from)) MoveSafe(from, doc.GetFilePath(newName));
-        ReplaceFileReferences(doc.Piece, entry.FileName, newName);
+        ReplaceFileReferences(doc.Piece.Id, entry.FileName, newName);
         entry.FileName = newName;
         entry.Version = label;
     }
 
-    private static void ReplaceFileReferences(ArtPiece piece, string oldName, string newName)
-    {
-        foreach (var p in piece.Products)
-        {
-            for (var i = 0; i < p.Files.Count; i++)
-                if (NameRules.NamesEqual(p.Files[i], oldName)) p.Files[i] = newName;
-        }
-    }
-
-    private static void RemoveName(IList<string> list, string name)
-    {
-        for (var i = list.Count - 1; i >= 0; i--)
-            if (NameRules.NamesEqual(list[i], name)) list.RemoveAt(i);
-    }
+    private void ReplaceFileReferences(Guid pieceId, string oldName, string newName) =>
+        catalog?.ReplaceFileReference(pieceId, oldName, newName);
 
     /// <summary>Renames a file, including case-only renames, which need a temporary step on case-insensitive file systems.</summary>
     internal static void MoveSafe(string from, string to)

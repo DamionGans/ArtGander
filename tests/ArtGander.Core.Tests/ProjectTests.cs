@@ -26,7 +26,7 @@ public class ProjectTests
         Assert.Equal(ItemType.Piece, doc.Piece.Type);
         Assert.Equal(WorkStatus.Finished, doc.Piece.Status);
         var json = JsonNode.Parse(File.ReadAllText(doc.FilePath))!;
-        Assert.Equal(2, json["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(ArtGander.Core.Schema.CurrentSchema.Version, json["schemaVersion"]!.GetValue<int>());
         Assert.Equal("piece", json["type"]!.GetValue<string>());
         Assert.Null(json["isProject"]); // computed properties are not written
         Assert.True(File.Exists(Path.Combine(folder, ".artgander.json.v1.bak")));
@@ -165,26 +165,26 @@ public class ProjectTests
         var project = Service.CreateProject(lib.Root, "Goose Book");
         var a = Service.CreatePieceInProject(project, "Page 1");
         var b = Service.CreatePieceInProject(project, "Page 2");
-        var printA = new Product { Name = "A4 print", ProductionCost = 4 };
-        var printB = new Product { Name = "A4 print", ProductionCost = 5 };
-        a.Piece.Products.Add(printA);
-        b.Piece.Products.Add(printB);
+        var printA = new Product { Name = "A4 print", ProductionCost = 4, Pieces = [a.Piece.Id] };
+        var printB = new Product { Name = "A4 print", ProductionCost = 5, Pieces = [b.Piece.Id] };
         var set = new Product
         {
             Name = "Set of prints",
+            Pieces = [project.Piece.Id],
             Includes = { new BundleItem { PieceId = a.Piece.Id, ProductId = printA.Id }, new BundleItem { PieceId = b.Piece.Id, ProductId = printB.Id, Quantity = 2 } },
         };
-        project.Piece.Products.Add(set);
-        project.Piece.Sales.Add(new Sale { OrderRef = "#1", ProductId = set.Id, UnitPrice = 40 });
-        a.Piece.Sales.Add(new Sale { OrderRef = "#1", ProductId = printA.Id, UnitPrice = 15 });
+        var order1 = new Order { OrderRef = "#1" };
+        order1.Lines.Add(new OrderLine { ProductId = set.Id, UnitPrice = 40 });
+        order1.Lines.Add(new OrderLine { ProductId = printA.Id, UnitPrice = 15 });
         a.ProjectTitle = "Goose Book";
 
-        var rows = SalesReport.Rows([project, a, b]);
+        var order = Assert.Single(SalesReport.Orders([order1], [printA, printB, set], [project, a, b]));
+        var rows = order.Lines;
 
         var setRow = rows.Single(r => r.Product == set);
-        Assert.Equal(14, setRow.Cost); // 4 + 2 × 5
+        Assert.Equal(14, setRow.Cost); // 4 + 2 x 5
         Assert.Equal("Goose Book › Page 1", rows.Single(r => r.Product == printA).PieceTitle);
-        var order = Assert.Single(SalesReport.Orders(rows));
         Assert.Equal(55, order.Revenue);
+        Assert.Equal(2, SalesReport.ForPiece(rows, a.Piece.Id).Count); // directly, and as part of the set
     }
 }

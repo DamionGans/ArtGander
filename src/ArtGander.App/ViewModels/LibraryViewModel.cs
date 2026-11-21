@@ -90,12 +90,22 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     // ---- Building the grid -------------------------------------------------------------------------
 
+    private PieceStats StatsFor(PieceFolder folder, IReadOnlyList<SaleRow> rows)
+    {
+        if (folder.Document?.Piece is not { } piece) return PieceStats.Empty;
+        var ids = folder.Children.Select(c => c.Document?.Piece.Id).OfType<Guid>().Prepend(piece.Id).ToList();
+        var products = _app.Catalog.ForPiece(piece.Id);
+        var sold = rows.Where(r => ids.Any(id => r.Line.PieceId == id || (r.Product is { } pr && ProductCatalog.Shows(pr, id)))).Sum(r => r.Line.Quantity);
+        return new PieceStats(products.Count, sold, products.Select(pr => pr.Name).ToList());
+    }
+
     private void Rebuild()
     {
         var previous = _all.ToDictionary(i => i.Folder.FolderPath, StringComparer.Ordinal);
+        var rows = _app.SaleRows;
         _all = _app.AllFolders.Select(p =>
         {
-            var vm = new PieceItemViewModel(p) { IsSelecting = IsSelecting };
+            var vm = new PieceItemViewModel(p, StatsFor(p, rows)) { IsSelecting = IsSelecting };
             if (previous.TryGetValue(p.FolderPath, out var prev))
             {
                 vm.IsSelected = prev.IsSelected; // keep the selection across refreshes
@@ -399,9 +409,16 @@ public sealed partial class LibraryViewModel : ObservableObject
         });
 }
 
-public sealed partial class PieceItemViewModel(PieceFolder folder) : ObservableObject
+/// <summary>Product and sales numbers for a library item.</summary>
+public sealed record PieceStats(int Products, int Sold, IReadOnlyList<string> ProductNames)
+{
+    public static PieceStats Empty { get; } = new(0, 0, []);
+}
+
+public sealed partial class PieceItemViewModel(PieceFolder folder, PieceStats? stats = null) : ObservableObject
 {
     public PieceFolder Folder { get; } = folder;
+    public PieceStats Stats { get; } = stats ?? PieceStats.Empty;
     public string Title => Folder.Parent is null ? Folder.Title : Folder.DisplayPath;
     public string? PreviewSource => Folder.PreviewFilePath;
     public bool IsProject => Folder.IsProject;
@@ -436,7 +453,7 @@ public sealed partial class PieceItemViewModel(PieceFolder folder) : ObservableO
             }
             if (p.Collections.Count > 0) parts.Add(string.Join(", ", p.Collections));
             if (!p.IsProject) parts.Add($"{p.Files.Count} file{(p.Files.Count == 1 ? "" : "s")}");
-            if (p.Products.Count > 0) parts.Add($"{p.Products.Count} product{(p.Products.Count == 1 ? "" : "s")}");
+            if (Stats.Products > 0) parts.Add($"{Stats.Products} product{(Stats.Products == 1 ? "" : "s")}");
             return string.Join(" · ", parts);
         }
     }
@@ -464,8 +481,7 @@ public sealed partial class PieceItemViewModel(PieceFolder folder) : ObservableO
         {
             var p = Folder.Document?.Piece;
             if (p is null) return "";
-            var sold = p.Sales.Sum(s => s.Quantity) + Folder.Children.Sum(c => c.Document?.Piece.Sales.Sum(s => s.Quantity) ?? 0);
-            return sold > 0 ? $"{sold} sold" : "";
+            return Stats.Sold > 0 ? $"{Stats.Sold} sold" : "";
         }
     }
 
@@ -477,7 +493,7 @@ public sealed partial class PieceItemViewModel(PieceFolder folder) : ObservableO
         return p.Description.Contains(query, StringComparison.CurrentCultureIgnoreCase)
                || p.Tags.Any(t => t.Contains(query, StringComparison.CurrentCultureIgnoreCase))
                || p.Collections.Any(c => c.Contains(query, StringComparison.CurrentCultureIgnoreCase))
-               || p.Products.Any(pr => pr.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase));
+               || Stats.ProductNames.Any(n => n.Contains(query, StringComparison.CurrentCultureIgnoreCase));
     }
 
     public bool InCollection(string collection) =>

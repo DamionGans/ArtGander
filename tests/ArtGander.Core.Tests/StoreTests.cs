@@ -26,7 +26,7 @@ public class StoreTests
         var store = new ArtPieceStore();
         var doc = store.Load(folder);
         Assert.Equal(CopyrightStatus.Registered, doc.Piece.Copyright.Status);
-        Assert.Equal(ProductType.PrintOnDemand, doc.Piece.Products[0].Type);
+        Assert.Equal(ProductType.PrintOnDemand, doc.Piece.LegacyProducts![0].Type);
         Assert.False(doc.HasUnsavedChanges);
 
         doc.Piece.Description = "Honk";

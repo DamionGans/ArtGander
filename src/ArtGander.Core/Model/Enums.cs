@@ -38,7 +38,14 @@ public enum OriginalStatus { Available, Reserved, Sold, NotForSale, Gifted }
 public enum CopyrightStatus { Unregistered, Pending, Registered }
 
 [JsonConverter(typeof(CamelCaseEnumConverter<ProductType>))]
-public enum ProductType { Original, SelfPrint, PrintOnDemand, Digital, Other }
+public enum ProductType { Original, SelfPrint, PrintOnDemand, Digital, Other, Handmade }
+
+[JsonConverter(typeof(CamelCaseEnumConverter<ProductStatus>))]
+public enum ProductStatus { Draft, Active, Archived }
+
+/// <summary>Who ships an order line: Printify, or you yourselves.</summary>
+[JsonConverter(typeof(CamelCaseEnumConverter<Fulfillment>))]
+public enum Fulfillment { Self, Printify, Digital }
 
 [JsonConverter(typeof(CamelCaseEnumConverter<ListingStatus>))]
 public enum ListingStatus { Draft, Active, Retired }

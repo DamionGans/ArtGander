@@ -121,21 +121,28 @@
 
             <!-- Items -->
             <Label Text="Items" Style="{StaticResource SectionTitle}" />
-            <Label Text="Each item is stored as a sale on its art piece or project. Order a whole project through one of the project's products (e.g. the printed book or a set of prints), or any single piece inside it." Style="{StaticResource Muted}" />
+            <Label Text="{Binding SourceText}" Style="{StaticResource Muted}" IsVisible="{Binding SourceText, Converter={StaticResource HasValue}}" />
             <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="6" Margin="0,6">
                 <BindableLayout.EmptyView>
                     <Label Text="No items yet." Style="{StaticResource Muted}" />
                 </BindableLayout.EmptyView>
                 <BindableLayout.ItemTemplate>
-                    <DataTemplate x:DataType="vm:OrderItemRow">
+                    <DataTemplate x:DataType="vm:OrderLineRow">
                         <Border Style="{StaticResource Card}" Padding="10,6">
-                            <Grid ColumnDefinitions="*,*,100,Auto,Auto" ColumnSpacing="10">
-                                <Label Text="{Binding PieceTitle}" FontAttributes="Bold" VerticalOptions="Center" />
-                                <Label Grid.Column="1" Text="{Binding Summary}" VerticalOptions="Center" />
-                                <Label Grid.Column="2" Text="{Binding Total, StringFormat='{0:N2}'}" HorizontalTextAlignment="End" VerticalOptions="Center" />
-                                <Button Grid.Column="3" Text="Open piece"
-                                        Command="{Binding OpenPieceCommand, Source={RelativeSource AncestorType={x:Type vm:OrderDetailViewModel}}, x:DataType=vm:OrderDetailViewModel}" CommandParameter="{Binding .}" />
-                                <Button Grid.Column="4" Text="Remove"
+                            <Grid ColumnDefinitions="*,70,100,100,150,90,Auto,Auto" ColumnSpacing="10">
+                                <VerticalStackLayout VerticalOptions="Center">
+                                    <Label Text="{Binding Title}" FontAttributes="Bold" />
+                                    <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" />
+                                </VerticalStackLayout>
+                                <Entry Grid.Column="1" Text="{Binding Line.Quantity, Converter={StaticResource Int}}" Keyboard="Numeric" VerticalOptions="Center" />
+                                <Entry Grid.Column="2" Text="{Binding Line.UnitPrice, Converter={StaticResource Decimal}}" Keyboard="Numeric" VerticalOptions="Center" />
+                                <Entry Grid.Column="3" Text="{Binding Line.UnitCost, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" Placeholder="cost: product" VerticalOptions="Center" />
+                                <Picker Grid.Column="4" ItemsSource="{x:Static vm:OrderDetailViewModel.Fulfillments}" SelectedItem="{Binding Line.Fulfillment}" VerticalOptions="Center"
+                                        ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                <Label Grid.Column="5" Text="{Binding Total, StringFormat='{0:N2}'}" HorizontalTextAlignment="End" VerticalOptions="Center" />
+                                <Button Grid.Column="6" Text="Product" IsVisible="{Binding HasProduct}"
+                                        Command="{Binding OpenProductCommand, Source={RelativeSource AncestorType={x:Type vm:OrderDetailViewModel}}, x:DataType=vm:OrderDetailViewModel}" CommandParameter="{Binding .}" />
+                                <Button Grid.Column="7" Text="Remove"
                                         Command="{Binding RemoveItemCommand, Source={RelativeSource AncestorType={x:Type vm:OrderDetailViewModel}}, x:DataType=vm:OrderDetailViewModel}" CommandParameter="{Binding .}" />
                             </Grid>
                         </Border>
@@ -144,28 +151,36 @@
             </VerticalStackLayout>
 
             <Border Style="{StaticResource Card}">
-                <Grid ColumnDefinitions="2*,2*,80,100,Auto" ColumnSpacing="10">
+                <Grid ColumnDefinitions="2*,*,2*,70,100,Auto" ColumnSpacing="10">
                     <VerticalStackLayout>
-                        <Label Text="Art piece or project" Style="{StaticResource FieldLabel}" />
+                        <Label Text="Product" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding Products}" SelectedItem="{Binding NewItemProduct}"
+                                ItemDisplayBinding="{Binding Name, x:DataType=m:Product}" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1">
+                        <Label Text="Variant" Style="{StaticResource FieldLabel}" />
+                        <Picker ItemsSource="{Binding ProductVariants}" SelectedItem="{Binding NewItemVariant}" IsEnabled="{Binding HasVariants}"
+                                ItemDisplayBinding="{Binding Title, x:DataType=m:ProductVariant}" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="2">
+                        <Label Text="Art piece (optional)" Style="{StaticResource FieldLabel}" />
                         <Picker ItemsSource="{Binding Pieces}" SelectedItem="{Binding NewItemPiece}"
                                 ItemDisplayBinding="{Binding DisplayTitle, x:DataType=st:ArtPieceDocument}" />
                     </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1">
-                        <Label Text="Product" Style="{StaticResource FieldLabel}" />
-                        <Picker ItemsSource="{Binding PieceProducts}" SelectedItem="{Binding NewItemProduct}"
-                                ItemDisplayBinding="{Binding Name, x:DataType=m:Product}" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="2">
+                    <VerticalStackLayout Grid.Column="3">
                         <Label Text="Qty" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding NewItemQuantity}" Keyboard="Numeric" />
                     </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="3">
+                    <VerticalStackLayout Grid.Column="4">
                         <Label Text="Unit price" Style="{StaticResource FieldLabel}" />
                         <Entry Text="{Binding NewItemPrice}" Keyboard="Numeric" />
                     </VerticalStackLayout>
-                    <Button Grid.Column="4" Text="Add item" Command="{Binding AddItemCommand}" VerticalOptions="End" />
+                    <Button Grid.Column="5" Text="Add item" Command="{Binding AddItemCommand}" VerticalOptions="End" />
                 </Grid>
             </Border>
+            <Label Text="Order a whole project through one of the project's products (e.g. the printed book or a set of prints), or any single piece through its own products. For an original without a product, pick only the art piece."
+                   Style="{StaticResource Muted}" />
+            <Label Text="{Binding Notice}" Style="{StaticResource WarningText}" IsVisible="{Binding Notice, Converter={StaticResource HasValue}}" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

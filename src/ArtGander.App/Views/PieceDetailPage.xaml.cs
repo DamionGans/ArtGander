@@ -29,14 +29,7 @@ public partial class PieceDetailPage : ContentPage
     public System.Windows.Input.ICommand UntrackFileCommand => ViewModel.UntrackFileCommand;
     public System.Windows.Input.ICommand TrackFileCommand => ViewModel.TrackFileCommand;
     public System.Windows.Input.ICommand TrackFileAsIsCommand => ViewModel.TrackFileAsIsCommand;
-    public System.Windows.Input.ICommand RemoveProductCommand => ViewModel.RemoveProductCommand;
-    public System.Windows.Input.ICommand AddCostLineCommand => ViewModel.AddCostLineCommand;
-    public System.Windows.Input.ICommand RemoveCostLineCommand => ViewModel.RemoveCostLineCommand;
-    public System.Windows.Input.ICommand SumCostsCommand => ViewModel.SumCostsCommand;
-    public System.Windows.Input.ICommand AddListingCommand => ViewModel.AddListingCommand;
-    public System.Windows.Input.ICommand RemoveListingCommand => ViewModel.RemoveListingCommand;
     public System.Windows.Input.ICommand OpenUrlCommand => ViewModel.OpenUrlCommand;
-    public System.Windows.Input.ICommand RemoveSaleCommand => ViewModel.RemoveSaleCommand;
 
     protected override void OnAppearing()
     {

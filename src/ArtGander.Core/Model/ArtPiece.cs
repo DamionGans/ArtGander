@@ -37,8 +37,13 @@ public sealed partial class ArtPiece : ModelBase
     public Artwork Artwork { get; set; } = new();
     public Copyright Copyright { get; set; } = new();
     public ObservableCollection<FileEntry> Files { get; set; } = [];
-    public ObservableCollection<Product> Products { get; set; } = [];
-    public ObservableCollection<Sale> Sales { get; set; } = [];
+
+    /// <summary>
+    /// Products and sales from format version 2, when they were stored inside the piece. ArtGander moves them to
+    /// product and order files (<see cref="Services.LibraryMigrator"/>) and then clears these. Never written when empty.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<LegacyProduct>? LegacyProducts { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<LegacySale>? LegacySales { get; set; }
 
     [ObservableProperty] public partial string Notes { get; set; } = "";
 
@@ -49,8 +54,6 @@ public sealed partial class ArtPiece : ModelBase
 
     public FileEntry? FindFile(string fileName) =>
         Files.FirstOrDefault(f => NameRules.NamesEqual(f.FileName, fileName));
-
-    public Product? FindProduct(Guid? id) => id is null ? null : Products.FirstOrDefault(p => p.Id == id);
 }
 
 /// <summary>The physical (or original digital) work itself.</summary>
@@ -85,72 +88,4 @@ public sealed partial class FileEntry : ModelBase
     [ObservableProperty] public partial string Kind { get; set; } = FileKind.Other;
     [ObservableProperty] public partial string Notes { get; set; } = "";
     public DateTimeOffset? AddedAt { get; set; }
-}
-
-/// <summary>
-/// Something that gets sold: the original, a self-printed copy, a Printify product, and so on.
-/// It links to any number of files by file name, independently of those files' version labels.
-/// </summary>
-public sealed partial class Product : ModelBase
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    [ObservableProperty] public partial string Name { get; set; } = "";
-    [ObservableProperty] public partial ProductType Type { get; set; } = ProductType.SelfPrint;
-    [ObservableProperty] public partial string Provider { get; set; } = "";
-    [ObservableProperty] public partial string Variant { get; set; } = "";
-    public ObservableCollection<string> Files { get; set; } = [];
-    [ObservableProperty] public partial decimal? ProductionCost { get; set; }
-    [ObservableProperty] public partial decimal? Price { get; set; }
-    [ObservableProperty] public partial string Currency { get; set; } = "EUR";
-    public ObservableCollection<CostLine> CostBreakdown { get; set; } = [];
-    [ObservableProperty] public partial int? EditionSize { get; set; }
-    [ObservableProperty] public partial int? Stock { get; set; }
-    public ObservableCollection<Listing> Listings { get; set; } = [];
-    [ObservableProperty] public partial string Notes { get; set; } = "";
-
-    /// <summary>Project products only: the pieces (and optionally their products) a bundle contains, e.g. "Set of 3 prints".</summary>
-    public ObservableCollection<BundleItem> Includes { get; set; } = [];
-
-    /// <summary>The price minus the production cost, or null when either is unknown.</summary>
-    [JsonIgnore] public decimal? Margin => Price is { } p && ProductionCost is { } c ? p - c : null;
-
-    partial void OnPriceChanged(decimal? value) => OnPropertyChanged(nameof(Margin));
-    partial void OnProductionCostChanged(decimal? value) => OnPropertyChanged(nameof(Margin));
-}
-
-/// <summary>Where a product is offered: a Shopify listing, a Printify product, an in-person fair, and so on.</summary>
-public sealed partial class Listing : ModelBase
-{
-    [ObservableProperty] public partial string Channel { get; set; } = "shopify";
-    [ObservableProperty] public partial string Url { get; set; } = "";
-    [ObservableProperty] public partial string ExternalId { get; set; } = "";
-    [ObservableProperty] public partial decimal? Price { get; set; }
-    [ObservableProperty] public partial ListingStatus Status { get; set; } = ListingStatus.Active;
-}
-
-/// <summary>One order line. When an order spans several pieces, each line carries the same <see cref="OrderRef"/>.</summary>
-public sealed partial class Sale : ModelBase
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    [ObservableProperty] public partial DateOnly Date { get; set; } = DateOnly.FromDateTime(DateTime.Today);
-    [ObservableProperty] public partial string OrderRef { get; set; } = "";
-    [ObservableProperty] public partial string Channel { get; set; } = "shopify";
-    [ObservableProperty] public partial Guid? ProductId { get; set; }
-    [ObservableProperty] public partial int Quantity { get; set; } = 1;
-    [ObservableProperty] public partial decimal UnitPrice { get; set; }
-    [ObservableProperty] public partial decimal Fees { get; set; }
-    /// <summary>The cost per unit at the time of the sale. Left empty, the product's production cost is used.</summary>
-    [ObservableProperty] public partial decimal? UnitCost { get; set; }
-    [ObservableProperty] public partial string Currency { get; set; } = "EUR";
-    [ObservableProperty] public partial string Customer { get; set; } = "";
-    [ObservableProperty] public partial string Notes { get; set; } = "";
-}
-
-/// <summary>One art piece inside a project bundle product.</summary>
-public sealed partial class BundleItem : ModelBase
-{
-    [ObservableProperty] public partial Guid PieceId { get; set; }
-    /// <summary>Optional: the piece's product that is included (its production cost is used for "Use pieces' cost").</summary>
-    [ObservableProperty] public partial Guid? ProductId { get; set; }
-    [ObservableProperty] public partial int Quantity { get; set; } = 1;
 }

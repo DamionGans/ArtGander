@@ -18,13 +18,12 @@ public sealed partial class PieceDetailViewModel(
     AppState app,
     ArtPieceStore store,
     PieceService pieces,
+    ProductCatalog catalog,
     IPlatformServices platform,
     ThumbnailService thumbs) : ObservableObject, IQueryAttributable
 {
-    public static IReadOnlyList<ProductType> ProductTypes { get; } = Enum.GetValues<ProductType>();
     public static IReadOnlyList<OriginalStatus> OriginalStatuses { get; } = Enum.GetValues<OriginalStatus>();
     public static IReadOnlyList<CopyrightStatus> CopyrightStatuses { get; } = Enum.GetValues<CopyrightStatus>();
-    public static IReadOnlyList<ListingStatus> ListingStatuses { get; } = Enum.GetValues<ListingStatus>();
 
     private IDispatcherTimer? _diskCheck;
     private string _savedCollections = "";
@@ -59,8 +58,11 @@ public sealed partial class PieceDetailViewModel(
 
     public ObservableCollection<FileRowViewModel> Files { get; } = [];
     public ObservableCollection<UntrackedFileViewModel> Untracked { get; } = [];
-    public ObservableCollection<ProductViewModel> Products { get; } = [];
-    public ObservableCollection<SaleViewModel> Sales { get; } = [];
+    public ObservableCollection<LinkedProductRow> LinkedProducts { get; } = [];
+    public ObservableCollection<Product> AvailableProducts { get; } = [];
+    [ObservableProperty] public partial Product? SelectedAvailableProduct { get; set; }
+    public bool HasLinkedProducts => LinkedProducts.Count > 0;
+    public ObservableCollection<SaleRow> Sales { get; } = [];
 
     [ObservableProperty] public partial string SalesSummary { get; set; } = "";
 
@@ -155,39 +157,12 @@ public sealed partial class PieceDetailViewModel(
             Untracked.Add(new UntrackedFileViewModel(name, version, PieceService.GuessKind(version, Path.GetExtension(name), app.Settings.FileKinds)));
         }
         _ = LoadThumbnailAsync(folder.PreviewFilePath);
-        foreach (var p in Products) p.RebuildLinks(Doc.Piece.Files);
     }
 
     private async Task LoadThumbnailAsync(string? path)
     {
         var thumb = await thumbs.GetAsync(path);
         MainThread.BeginInvokeOnMainThread(() => Thumbnail = thumb is null ? null : ImageSource.FromFile(thumb));
-    }
-
-    private void RebuildProducts()
-    {
-        Products.Clear();
-        if (Doc is null) return;
-        foreach (var p in Doc.Piece.Products) Products.Add(new ProductViewModel(p, Doc.Piece.Files));
-    }
-
-    private void RebuildSales()
-    {
-        Sales.Clear();
-        if (Doc is null) return;
-        foreach (var s in Doc.Piece.Sales.OrderByDescending(s => s.Date)) Sales.Add(new SaleViewModel(s, Doc.Piece.Products));
-        UpdateSalesSummary();
-    }
-
-    private void UpdateSalesSummary()
-    {
-        if (Doc is null) return;
-        var rows = SalesReport.Rows((ArtPieceDocument[])[Doc]);
-        var qty = rows.Sum(r => r.Sale.Quantity);
-        SalesSummary = (qty == 0
-            ? "No sales recorded yet."
-            : $"{qty} sold · revenue {rows.Sum(r => r.Revenue):N2} · profit {rows.Sum(r => r.Profit):N2} {Currency}")
-            + (ProjectRollupText() is { Length: > 0 } rollup ? Environment.NewLine + rollup : "");
     }
 
     // ---- Lifecycle ---------------------------------------------------------------------------------
@@ -199,7 +174,7 @@ public sealed partial class PieceDetailViewModel(
         _diskCheck.Tick -= OnDiskCheck;
         _diskCheck.Tick += OnDiskCheck;
         _diskCheck.Start();
-        if (Doc is not null) BindProject(); // e.g. back from a piece of this project
+        if (Doc is not null) { BindProject(); RebuildProducts(); RebuildSales(); } // e.g. back from a product or a piece of this project
     }
 
     public void OnDisappearing() => _diskCheck?.Stop();
@@ -416,10 +391,9 @@ public sealed partial class PieceDetailViewModel(
         if (row is null) return;
         var msg = row.IsMissing
             ? $"Remove the missing file \"{row.Entry.FileName}\" from this piece's list?"
-            : $"Stop tracking \"{row.Entry.FileName}\"? The file stays in the folder, and product links to it are removed.";
+            : $"Stop tracking \"{row.Entry.FileName}\"? The file stays in the folder, and products that use it no longer link to it.";
         if (!await Dialogs.ConfirmAsync("Remove from piece", msg, "Remove")) return;
         await FileOpAsync(() => pieces.UntrackFile(Doc!, row.Entry));
-        foreach (var p in Products) p.RebuildLinks(Doc!.Piece.Files);
     }
 
     [RelayCommand]
@@ -436,61 +410,83 @@ public sealed partial class PieceDetailViewModel(
 
     // ---- Products ----------------------------------------------------------------------------------
 
-    [RelayCommand]
-    private void AddProduct()
+    private void RebuildProducts()
     {
-        if (Piece is null) return;
-        var product = new Product { Name = "", Currency = Currency, Type = ProductType.SelfPrint };
-        Piece.Products.Add(product);
-        var vm = new ProductViewModel(product, Piece.Files);
-        if (IsProject) vm.RebuildBundle(_children);
-        Products.Add(vm);
+        LinkedProducts.Clear();
+        AvailableProducts.Clear();
+        if (Doc is null) return;
+        var linked = catalog.ForPiece(Doc.Piece.Id);
+        foreach (var p in linked) LinkedProducts.Add(new LinkedProductRow(p, Doc.Piece.Id, ProductCatalog.Shows(p, Doc.Piece.Id) && !p.Pieces.Contains(Doc.Piece.Id)));
+        foreach (var p in catalog.All.Except(linked)) AvailableProducts.Add(p);
+        SelectedAvailableProduct = null;
+        OnPropertyChanged(nameof(HasLinkedProducts));
+    }
+
+    private void RebuildSales()
+    {
+        Sales.Clear();
+        if (Doc is null) return;
+        foreach (var r in SalesReport.ForPiece(app.SaleRows, Doc.Piece.Id)) Sales.Add(r);
+        UpdateSalesSummary();
+    }
+
+    private void UpdateSalesSummary()
+    {
+        if (Doc is null) return;
+        var qty = Sales.Sum(r => r.Line.Quantity);
+        SalesSummary = (qty == 0
+            ? "No sales recorded yet."
+            : $"{qty} sold · revenue {Sales.Sum(r => r.Revenue):N2} · profit {Sales.Sum(r => r.Profit):N2} {Currency}")
+            + (ProjectRollupText() is { Length: > 0 } rollup ? Environment.NewLine + rollup : "");
     }
 
     [RelayCommand]
-    private void RemoveProduct(ProductViewModel? vm) => Ui.Fire(() => RemoveProductAsync(vm));
+    private void NewProduct() => Ui.Fire(NewProductAsync);
 
-    private async Task RemoveProductAsync(ProductViewModel? vm)
+    private async Task NewProductAsync()
     {
-        if (vm is null || Piece is null) return;
-        var used = Piece.Sales.Count(s => s.ProductId == vm.Product.Id);
-        var msg = used > 0 ? $"{used} recorded sale(s) refer to this product. They are kept, but lose their product link." : "This product will be removed when you save.";
-        if (!await Dialogs.ConfirmAsync($"Remove \"{vm.Header}\"?", msg, "Remove")) return;
-        Piece.Products.Remove(vm.Product);
-        Products.Remove(vm);
+        if (Doc is null) return;
+        if (HasUnsavedChanges && !await TrySaveAsync()) return;
+        await ProductsViewModel.OpenNewProductAsync(Doc.Piece.Id);
     }
 
     [RelayCommand]
-    private void AddListing(ProductViewModel? vm) =>
-        vm?.Product.Listings.Add(new Listing { Channel = Channels.FirstOrDefault() ?? "shopify", Price = vm.Product.Price });
+    private void LinkProduct() => Ui.Fire(LinkProductAsync);
 
-    [RelayCommand]
-    private void RemoveListing(Listing? listing)
+    private async Task LinkProductAsync()
     {
-        if (listing is null || Piece is null) return;
-        foreach (var p in Piece.Products) if (p.Listings.Remove(listing)) return;
+        if (Doc is null || SelectedAvailableProduct is not { } product) { await Dialogs.AlertAsync("Pick a product", "Choose an existing product to link to this art piece."); return; }
+        try
+        {
+            using (app.SuspendWatching()) catalog.Link(product, Doc.Piece.Id);
+        }
+        catch (Exception ex) { await Dialogs.ErrorAsync(ex); }
+        RebuildProducts();
+        RebuildSales();
     }
 
     [RelayCommand]
-    private void AddCostLine(ProductViewModel? vm) => vm?.Product.CostBreakdown.Add(new CostLine());
+    private void OpenProduct(LinkedProductRow? row) => Ui.Fire(() => row is null ? Task.CompletedTask : ProductsViewModel.OpenProductAsync(row.Product.Id));
 
     [RelayCommand]
-    private void RemoveCostLine(CostLine? line)
-    {
-        if (line is null || Piece is null) return;
-        foreach (var p in Piece.Products) if (p.CostBreakdown.Remove(line)) return;
-    }
+    private void UnlinkProduct(LinkedProductRow? row) => Ui.Fire(() => UnlinkProductAsync(row));
 
-    [RelayCommand]
-    private void SumCosts(ProductViewModel? vm)
+    private async Task UnlinkProductAsync(LinkedProductRow? row)
     {
-        if (vm is not null) vm.Product.ProductionCost = vm.Product.CostBreakdown.Sum(c => c.Amount);
+        if (row is null || Doc is null) return;
+        if (!await Dialogs.ConfirmAsync($"Unlink \"{row.Product.Name}\"?", "The product itself is kept, it just no longer shows this art piece.", "Unlink")) return;
+        try
+        {
+            using (app.SuspendWatching()) catalog.Unlink(row.Product, Doc.Piece.Id);
+        }
+        catch (Exception ex) { await Dialogs.ErrorAsync(ex); }
+        RebuildProducts();
     }
 
     [RelayCommand]
     private void OpenUrl(string? url) => Ui.Fire(() => OpenUrlAsync(url));
 
-    private async Task OpenUrlAsync(string? url)
+    private static async Task OpenUrlAsync(string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return;
         if (!url.Contains("://", StringComparison.Ordinal)) url = "https://" + url;
@@ -501,34 +497,26 @@ public sealed partial class PieceDetailViewModel(
     // ---- Sales -------------------------------------------------------------------------------------
 
     [RelayCommand]
-    private void AddSale()
-    {
-        if (Piece is null) return;
-        var product = Piece.Products.FirstOrDefault();
-        var sale = new Sale
-        {
-            Currency = Currency,
-            Channel = Channels.FirstOrDefault() ?? "shopify",
-            ProductId = product?.Id,
-            UnitPrice = product?.Price ?? 0,
-        };
-        Piece.Sales.Add(sale);
-        Sales.Insert(0, new SaleViewModel(sale, Piece.Products));
-        UpdateSalesSummary();
-    }
+    private void OpenOrder(SaleRow? row) => Ui.Fire(() => row is null ? Task.CompletedTask : OrdersViewModel.OpenOrderAsync(row.Order.Id));
 
     [RelayCommand]
-    private void RemoveSale(SaleViewModel? vm) => Ui.Fire(() => RemoveSaleAsync(vm));
+    private void RefreshSalesSummary() => RebuildSales();
+}
 
-    private async Task RemoveSaleAsync(SaleViewModel? vm)
+/// <summary>A product shown on an art piece's Products tab.</summary>
+public sealed class LinkedProductRow(Product product, Guid pieceId, bool viaBundleOrFile)
+{
+    public Product Product { get; } = product;
+    public string Title => string.IsNullOrWhiteSpace(Product.Name) ? "(unnamed product)" : Product.Name;
+    public string Details => string.Join(" · ", new[]
     {
-        if (vm is null || Piece is null) return;
-        if (!await Dialogs.ConfirmAsync("Remove this sale?", $"{vm.Sale.Date:d} · {vm.Sale.OrderRef} · {vm.Revenue:N2} {vm.Sale.Currency}", "Remove")) return;
-        Piece.Sales.Remove(vm.Sale);
-        Sales.Remove(vm);
-        UpdateSalesSummary();
-    }
-
-    [RelayCommand]
-    private void RefreshSalesSummary() => UpdateSalesSummary();
+        Converters.HumanizeConverter.Humanize(Product.Type.ToString()),
+        Product.Price is { } p ? $"{p:N2} {Product.Currency}" : "",
+        Product.Variants.Count > 0 ? $"{Product.Variants.Count} variants" : "",
+        Product.Pieces.Count > 1 ? $"{Product.Pieces.Count} art pieces" : "",
+        viaBundleOrFile ? "part of a bundle" : "",
+        Converters.HumanizeConverter.Humanize(Product.Status.ToString()),
+    }.Where(x => x.Length > 0));
+    public string Channels => string.Join("  ", new[] { Product.IsOnPrintify ? "Printify" : "", Product.IsOnShopify ? "Shopify" : "" }.Where(x => x.Length > 0));
+    public Guid PieceId { get; } = pieceId;
 }

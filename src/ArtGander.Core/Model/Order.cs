@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -7,14 +8,15 @@ namespace ArtGander.Core.Model;
 public enum OrderStatus { Open, Paid, Shipped, Delivered, Cancelled, Refunded }
 
 /// <summary>
-/// Order-level details that don't belong to a single art piece: what the customer paid, shipping, tracking, and
-/// the actual production bill. Stored as <c>{ArtRoot}/.artgander/orders/{order}.json</c>. The individual items
-/// stay in each art piece's <c>artgander.json</c> as <see cref="Sale"/> lines with the same <see cref="OrderRef"/>.
-/// All tax fields are optional. Leave them empty to keep things simple.
+/// An order: its items (<see cref="Lines"/>), what the customer paid, shipping, tracking, and the actual production bill.
+/// Stored as <c>{ArtRoot}/.artgander/orders/{order}.json</c>. All tax fields are optional. Leave them empty to keep things simple.
+/// Orders imported from Shopify and Printify are combined into one order when they are the same order (<see cref="Sources"/>).
 /// </summary>
-public sealed partial class Order : ModelBase
+public sealed partial class Order : ModelBase, IStoredRecord
 {
-    public int SchemaVersion { get; set; } = 1;
+    public const int CurrentSchemaVersion = 2;
+
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public Guid Id { get; set; } = Guid.NewGuid();
 
     [ObservableProperty] public partial string OrderRef { get; set; } = "";
@@ -46,6 +48,61 @@ public sealed partial class Order : ModelBase
 
     [ObservableProperty] public partial string Notes { get; set; } = "";
 
+    public ObservableCollection<OrderLine> Lines { get; set; } = [];
+
+    /// <summary>Where this order was imported from.</summary>
+    public OrderSources Sources { get; set; } = new();
+
+    /// <summary>
+    /// The imported value of each imported field at the last import (field name → value). A field you changed yourself
+    /// since then is kept on the next import instead of being overwritten.
+    /// </summary>
+    public Dictionary<string, string?> ImportBase { get; set; } = [];
+
     public DateTimeOffset? UpdatedAt { get; set; }
     public string? UpdatedBy { get; set; }
+
+    [JsonIgnore] public string? StoredFileName { get; set; }
+    [JsonIgnore] public string? StoredHash { get; set; }
+
+    [JsonIgnore] public bool IsImported => Sources.Shopify is not null || Sources.Printify is not null;
+}
+
+/// <summary>One item of an order.</summary>
+public sealed partial class OrderLine : ModelBase
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    [ObservableProperty] public partial Guid? ProductId { get; set; }
+    [ObservableProperty] public partial string? VariantKey { get; set; }
+    /// <summary>The art piece, when the line is about one piece (e.g. selling the original without a product).</summary>
+    [ObservableProperty] public partial Guid? PieceId { get; set; }
+    /// <summary>The item's name as it was ordered. Kept so imported items that aren't linked to a product still read well.</summary>
+    [ObservableProperty] public partial string Title { get; set; } = "";
+    [ObservableProperty] public partial string Sku { get; set; } = "";
+    [ObservableProperty] public partial int Quantity { get; set; } = 1;
+    [ObservableProperty] public partial decimal UnitPrice { get; set; }
+    /// <summary>The cost per unit at the time of the order. Left empty, the product's production cost is used.</summary>
+    [ObservableProperty] public partial decimal? UnitCost { get; set; }
+    [ObservableProperty] public partial decimal Fees { get; set; }
+    [ObservableProperty] public partial Fulfillment Fulfillment { get; set; } = Fulfillment.Self;
+    [ObservableProperty] public partial string Notes { get; set; } = "";
+    /// <summary>The Shopify line item id, for imported lines.</summary>
+    public string? ShopifyLineId { get; set; }
+    /// <summary>The Printify line item key, for imported lines.</summary>
+    public string? PrintifyLineId { get; set; }
+}
+
+public sealed class OrderSources : ModelBase
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ExternalOrder? Shopify { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ExternalOrder? Printify { get; set; }
+}
+
+public sealed class ExternalOrder : ModelBase
+{
+    public string Id { get; set; } = "";
+    /// <summary>The name people see, e.g. "#1001".</summary>
+    public string Name { get; set; } = "";
+    public string? UpdatedAt { get; set; }
+    public DateTimeOffset? ImportedAt { get; set; }
 }

@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ArtGander.App.ViewModels;
 
-/// <summary>Every sale across the library, grouped into orders. Sales are entered on each art piece's Sales tab.</summary>
+/// <summary>Every order across the library, with filters and totals.</summary>
 public sealed partial class OrdersViewModel : ObservableObject
 {
     public static IReadOnlyList<string> Periods { get; } = (string[])["All time", "This year", "Last year", "Last 30 days", "Last 90 days"];
@@ -37,9 +37,9 @@ public sealed partial class OrdersViewModel : ObservableObject
 
     public void Rebuild()
     {
-        var rows = SalesReport.Rows(_app.Documents);
+        var all = _app.OrderSummaries;
 
-        var channels = rows.Select(r => r.Sale.Channel).Concat(_app.Settings.Channels)
+        var channels = all.Select(o => o.Channel).Concat(_app.Settings.Channels)
             .Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
         var selected = Channel;
         ChannelFilters.Clear();
@@ -57,20 +57,12 @@ public sealed partial class OrdersViewModel : ObservableObject
             _ => (DateOnly.MinValue, DateOnly.MaxValue),
         };
         var q = SearchText.Trim();
-        var filtered = rows.Where(r =>
-            r.Sale.Date >= from && r.Sale.Date <= to
-            && (Channel == AllChannels || string.Equals(r.Sale.Channel, Channel, StringComparison.OrdinalIgnoreCase))
-            && (q.Length == 0
-                || r.PieceTitle.Contains(q, StringComparison.CurrentCultureIgnoreCase)
-                || r.Sale.OrderRef.Contains(q, StringComparison.CurrentCultureIgnoreCase)
-                || r.Sale.Customer.Contains(q, StringComparison.CurrentCultureIgnoreCase)
-                || r.ProductName.Contains(q, StringComparison.CurrentCultureIgnoreCase)));
-
-        var details = _app.Orders.Where(o => o.Date >= from && o.Date <= to
-            && (Channel == AllChannels || string.Equals(o.Channel, Channel, StringComparison.OrdinalIgnoreCase)));
-        var orders = SalesReport.Orders(filtered, details)
-            .Where(o => q.Length == 0 || o.Lines.Count > 0 || o.OrderRef.Contains(q, StringComparison.CurrentCultureIgnoreCase)
-                        || o.Customer.Contains(q, StringComparison.CurrentCultureIgnoreCase) || o.TrackingText.Contains(q, StringComparison.CurrentCultureIgnoreCase))
+        bool Has(string text) => text.Contains(q, StringComparison.CurrentCultureIgnoreCase);
+        var orders = all.Where(o =>
+                o.Date >= from && o.Date <= to
+                && (Channel == AllChannels || string.Equals(o.Channel, Channel, StringComparison.OrdinalIgnoreCase))
+                && (q.Length == 0 || Has(o.OrderRef) || Has(o.Customer) || Has(o.TrackingText)
+                    || o.Lines.Any(l => Has(l.ProductName) || Has(l.PieceTitle))))
             .ToList();
         Orders.Clear();
         foreach (var o in orders) Orders.Add(o);
@@ -79,20 +71,12 @@ public sealed partial class OrdersViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Open(OrderSummary? order) => Ui.Fire(() => OpenAsync(order));
-
-    private Task OpenAsync(OrderSummary? order)
-    {
-        if (order is null) return Task.CompletedTask;
-        // Loose sales without an order number can only be edited on their piece.
-        if (order.OrderRef.Length == 0 && order.Lines.FirstOrDefault() is { } line)
-            return LibraryViewModel.OpenPieceAsync(line.Piece.FolderPath, "sales");
-        return OpenOrderAsync(order.OrderRef);
-    }
+    private void Open(OrderSummary? order) => Ui.Fire(() => order is null ? Task.CompletedTask : OpenOrderAsync(order.Details.Id));
 
     [RelayCommand]
-    private Task NewOrderAsync() => _app.HasRoot ? OpenOrderAsync("") : Dialogs.AlertAsync("No art folder", "Choose your art folder first.");
+    private Task NewOrderAsync() => _app.HasRoot ? OpenOrderAsync(null) : Dialogs.AlertAsync("No art folder", "Choose your art folder first.");
 
-    private static Task OpenOrderAsync(string orderRef) =>
-        Shell.Current.GoToAsync(AppShell.OrderRoute, new ShellNavigationQueryParameters { ["ref"] = orderRef });
+    /// <summary>Opens an order by id, or a new order when <paramref name="id"/> is null.</summary>
+    public static Task OpenOrderAsync(Guid? id) =>
+        Shell.Current.GoToAsync(AppShell.OrderRoute, new ShellNavigationQueryParameters { ["id"] = id?.ToString() ?? "" });
 }

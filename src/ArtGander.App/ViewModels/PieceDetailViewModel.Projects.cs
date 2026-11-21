@@ -66,16 +66,15 @@ public sealed partial class PieceDetailViewModel
         ProjectPiecesSummary = _children.Count == 0
             ? "No pieces yet. Add new ones, or move existing art pieces into this project."
             : $"{_children.Count} piece{(_children.Count == 1 ? "" : "s")}" + (planned > 0 ? $" · {planned} planned" : "") + " · in this order (e.g. the page order of a book)";
-        foreach (var p in Products) p.RebuildBundle(IsProject ? _children : []);
     }
 
     /// <summary>The project's own sales plus its pieces' sales.</summary>
     private string ProjectRollupText()
     {
         if (!IsProject || Doc is null || _children.Count == 0) return "";
-        var childDocs = _children.Select(c => c.Document).OfType<ArtPieceDocument>().ToList();
-        var rows = SalesReport.Rows(childDocs.Prepend(Doc).ToList());
-        var qty = rows.Sum(r => r.Sale.Quantity);
+        var ids = _children.Select(c => c.Document?.Piece.Id).OfType<Guid>().Prepend(Doc.Piece.Id).ToList();
+        var rows = app.SaleRows.Where(r => ids.Any(id => SalesReport.ForPiece([r], id).Count > 0)).ToList();
+        var qty = rows.Sum(r => r.Line.Quantity);
         return qty == 0 ? "" : $"Including its pieces: {qty} sold · revenue {rows.Sum(r => r.Revenue):N2} · profit {rows.Sum(r => r.Profit):N2} {Currency}";
     }
 
@@ -180,13 +179,6 @@ public sealed partial class PieceDetailViewModel
         Tab = "pieces";
     }
 
-    [RelayCommand]
-    private void UseBundleCost(ProductViewModel? vm)
-    {
-        if (vm is null) return;
-        var lookup = SalesReport.PieceLookup(_children.Select(c => c.Document?.Piece).OfType<ArtPiece>());
-        if (SalesReport.BundleCost(vm.Product, lookup) is { } cost) vm.Product.ProductionCost = cost;
-    }
 }
 
 /// <summary>A piece on a project's Pieces tab.</summary>
@@ -207,53 +199,5 @@ public sealed partial class ProjectPieceRow(PieceFolder folder, int position) : 
     {
         var path = await thumbs.GetAsync(Folder.PreviewFilePath);
         if (path is not null) MainThread.BeginInvokeOnMainThread(() => Thumbnail = ImageSource.FromFile(path));
-    }
-}
-
-/// <summary>One project piece on a bundle product: whether it's included, which of its products, and how many.</summary>
-public sealed partial class BundleLink : ObservableObject
-{
-    private readonly Product _bundle;
-
-    public BundleLink(Product bundle, PieceFolder piece)
-    {
-        _bundle = bundle;
-        Piece = piece;
-        PieceProducts = piece.Document?.Piece.Products.ToList() ?? [];
-        var item = Item;
-        IsIncluded = item is not null;
-        Quantity = item?.Quantity ?? 1;
-        SelectedProduct = PieceProducts.FirstOrDefault(p => p.Id == item?.ProductId);
-    }
-
-    public PieceFolder Piece { get; }
-    public string Title => Piece.Title;
-    public IReadOnlyList<Product> PieceProducts { get; }
-
-    private BundleItem? Item => Piece.Document is { } d ? _bundle.Includes.FirstOrDefault(i => i.PieceId == d.Piece.Id) : null;
-
-    [ObservableProperty] public partial bool IsIncluded { get; set; }
-    [ObservableProperty] public partial Product? SelectedProduct { get; set; }
-    [ObservableProperty] public partial int Quantity { get; set; } = 1;
-
-    partial void OnIsIncludedChanged(bool value)
-    {
-        if (Piece.Document is not { } d) return;
-        var item = Item;
-        if (value && item is null)
-            _bundle.Includes.Add(new BundleItem { PieceId = d.Piece.Id, ProductId = SelectedProduct?.Id ?? PieceProducts.FirstOrDefault()?.Id, Quantity = Quantity });
-        else if (!value && item is not null)
-            _bundle.Includes.Remove(item);
-        if (value && SelectedProduct is null) SelectedProduct = PieceProducts.FirstOrDefault();
-    }
-
-    partial void OnSelectedProductChanged(Product? value)
-    {
-        if (Item is { } item && value is not null) item.ProductId = value.Id;
-    }
-
-    partial void OnQuantityChanged(int value)
-    {
-        if (Item is { } item) item.Quantity = Math.Max(1, value);
     }
 }

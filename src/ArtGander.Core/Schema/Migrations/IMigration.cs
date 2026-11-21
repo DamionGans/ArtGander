@@ -19,5 +19,6 @@ public static class MigrationCatalog
     public static IReadOnlyList<IMigration> All { get; } =
     [
         new V1ToV2_ItemType(),
+        new V2ToV3_SeparateProducts(),
     ];
 }

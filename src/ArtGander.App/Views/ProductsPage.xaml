@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             x:Class="ArtGander.App.Views.ProductsPage"
+             Shell.NavBarIsVisible="False"
+             x:DataType="vm:ProductsViewModel"
+             Title="Products">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="24,16,24,0" RowSpacing="12">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <VerticalStackLayout>
+                <Label Text="Products" Style="{StaticResource PageTitle}" />
+                <Label Text="What you sell: Printify products, things you make and ship yourselves, originals, downloads. Each product can show one or more art pieces."
+                       Style="{StaticResource Muted}" />
+            </VerticalStackLayout>
+            <Button Grid.Column="1" Text="New product" Command="{Binding NewProductCommand}" VerticalOptions="Center" />
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,170,150,150" ColumnSpacing="12">
+            <SearchBar Placeholder="Search name, art piece, tag, SKU…" Text="{Binding SearchText}" />
+            <Picker Grid.Column="1" Title="Type" ItemsSource="{x:Static vm:ProductsViewModel.TypeFilters}" SelectedItem="{Binding TypeFilter}" />
+            <Picker Grid.Column="2" Title="Status" ItemsSource="{x:Static vm:ProductsViewModel.StatusFilters}" SelectedItem="{Binding StatusFilter}" />
+            <Picker Grid.Column="3" Title="Online" ItemsSource="{x:Static vm:ProductsViewModel.ChannelFilters}" SelectedItem="{Binding ChannelFilter}" />
+        </Grid>
+
+        <Label Grid.Row="2" Text="{Binding SummaryText}" Style="{StaticResource Muted}" />
+
+        <CollectionView Grid.Row="3" ItemsSource="{Binding Products}" SelectionMode="None">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProductTile">
+                    <Border Style="{StaticResource Card}" Padding="10" Margin="0,0,0,6" MaximumWidthRequest="1000" HorizontalOptions="Fill">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type vm:ProductsViewModel}}, x:DataType=vm:ProductsViewModel}" CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="72,*,Auto,120" ColumnSpacing="14">
+                            <Border Style="{StaticResource Thumb}" HeightRequest="72" WidthRequest="72">
+                                <Grid>
+                                    <Image Source="placeholder.png" Opacity="0.5" Margin="14" />
+                                    <Image Source="{Binding Thumbnail}" Aspect="AspectFit" />
+                                </Grid>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                                <Label Text="{Binding Title}" FontSize="16" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                <Label Text="{Binding PiecesText}" LineBreakMode="TailTruncation" />
+                                <Label Text="{Binding TypeText}" Style="{StaticResource Muted}" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center">
+                                <Border Style="{StaticResource Banner}" Padding="6,2" IsVisible="{Binding OnPrintify}"><Label Text="Printify" FontSize="11" /></Border>
+                                <Border Style="{StaticResource Banner}" Padding="6,2" IsVisible="{Binding OnShopify}"><Label Text="Shopify" FontSize="11" /></Border>
+                            </HorizontalStackLayout>
+                            <Label Grid.Column="3" Text="{Binding PriceText}" HorizontalTextAlignment="End" VerticalOptions="Center" FontAttributes="Bold" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

@@ -16,6 +16,7 @@ namespace ArtGander.Core.Schema;
 [JsonSerializable(typeof(ArtPiece))]
 [JsonSerializable(typeof(LibrarySettings))]
 [JsonSerializable(typeof(Order))]
+[JsonSerializable(typeof(Product))]
 internal sealed partial class ArtGanderJsonContext : JsonSerializerContext;
 
 /// <summary>
@@ -39,6 +40,8 @@ public static class ArtGanderJson
     public static ArtPiece? DeserializePiece(string json) => JsonSerializer.Deserialize(json, Context.ArtPiece);
     public static LibrarySettings? DeserializeLibrary(string json) => JsonSerializer.Deserialize(json, Context.LibrarySettings);
     public static Order? DeserializeOrder(string json) => JsonSerializer.Deserialize(json, Context.Order);
+    public static Product? DeserializeProduct(string json) => JsonSerializer.Deserialize(json, Context.Product);
+    public static string Serialize(Product product) => JsonSerializer.Serialize(product, Context.Product) + "\n";
 
     public static readonly JsonDocumentOptions DocumentOptions = new()
     {
