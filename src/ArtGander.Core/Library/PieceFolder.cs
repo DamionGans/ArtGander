@@ -126,8 +126,9 @@ public sealed class PieceFolder
     }
 
     /// <summary>
-    /// Picks the best file to show as the thumbnail. For a project: a "cover" file if there is one, then its own
-    /// images, then the first piece's preview.
+    /// Picks the best file to show as the thumbnail: the cover (the file named after the piece without a version,
+    /// or one of kind "cover"), then the other images, then (for a project) the first piece's preview.
+    /// An untracked cover file counts too.
     /// </summary>
     public string? PreviewFilePath
     {
@@ -135,10 +136,11 @@ public sealed class PieceFolder
         {
             var images = Document?.Piece.Files
                 .Where(f => PreviewExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant()) && !MissingFiles.Contains(f.FileName))
-                .OrderBy(f => IsCover(f) ? -1 : PreviewRank(f.Kind))
+                .OrderBy(f => f.Version.Length == 0 && FileNamer.IsCoverName(FolderName, f.FileName) ? -2 : IsCover(f) ? -1 : PreviewRank(f.Kind))
                 .Select(f => f.FileName)
                 .ToList()
-                ?? UntrackedFiles.Where(f => PreviewExtensions.Contains(Path.GetExtension(f).ToLowerInvariant())).ToList();
+                ?? UntrackedFiles.Where(f => PreviewExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                    .OrderBy(f => FileNamer.IsCoverName(FolderName, f) ? 0 : 1).ToList();
             var first = images.FirstOrDefault();
             if (first is not null) return Path.Combine(FolderPath, first);
             return Children.Select(c => c.PreviewFilePath).FirstOrDefault(p => p is not null);

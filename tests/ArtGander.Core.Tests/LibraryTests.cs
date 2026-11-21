@@ -18,6 +18,25 @@ public class LibraryTests
     }
 
     [Fact]
+    public void The_cover_is_the_preview_and_follows_renames()
+    {
+        using var lib = new TempLibrary();
+        lib.WriteFile("Goose/Goose-photo.jpg");
+        lib.WriteFile("Goose/Goose.png"); // the official cropped art
+        var doc = Service.AdoptFolder(Path.Combine(lib.Root, "Goose"));
+
+        var cover = doc.Piece.FindFile("Goose.png")!;
+        Assert.Equal("", cover.Version);
+        Assert.Equal(FileKind.Cover, cover.Kind);
+        var folder = Assert.Single(new LibraryScanner(_store).Scan(lib.Root, TestContext.Current.CancellationToken));
+        Assert.Empty(folder.MisnamedFiles);
+        Assert.Equal(Path.Combine(lib.Root, "Goose", "Goose.png"), folder.PreviewFilePath);
+
+        Service.RenamePiece(doc, "Goose On The Loose");
+        Assert.True(File.Exists(Path.Combine(lib.Root, "Goose On The Loose", "Goose_On_The_Loose.png")));
+    }
+
+    [Fact]
     public void All_incompatible_names_are_fixed_with_one_call()
     {
         using var lib = new TempLibrary();

@@ -115,7 +115,7 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
     /// <summary>Starts tracking a file that already sits in the piece folder. It can optionally be renamed to the convention.</summary>
     public FileEntry TrackFile(ArtPieceDocument doc, string fileName, string version, string kind, bool renameToConvention)
     {
-        var entry = NewEntry(fileName, NameRules.ToVersionLabel(version), kind);
+        var entry = NewEntry(fileName, FileNamer.Label(version), kind);
         doc.Piece.Files.Add(entry);
         if (renameToConvention)
             RenameFileOnDisk(doc, entry, entry.Version);
@@ -222,10 +222,10 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
         EnsureNotChangedElsewhere(doc);
         var ext = Path.GetExtension(entry.FileName);
         var desired = FileNamer.Build(doc.FolderName, newVersion, ext);
-        if (desired == entry.FileName) { entry.Version = NameRules.ToVersionLabel(newVersion); return; }
+        if (desired == entry.FileName) { entry.Version = FileNamer.Label(newVersion); return; }
 
         var label = NameRules.NamesEqual(desired, entry.FileName)
-            ? NameRules.ToVersionLabel(newVersion) // only the case changes: the same file, so no uniqueness check needed
+            ? FileNamer.Label(newVersion) // only the case changes: the same file, so no uniqueness check needed
             : FileNamer.MakeUnique(doc.FolderName, newVersion, ext,
                 n => (File.Exists(doc.GetFilePath(n)) && !NameRules.NamesEqual(n, entry.FileName)) || (doc.Piece.FindFile(n) is { } f && f != entry));
         var newName = FileNamer.Build(doc.FolderName, label, ext);
@@ -285,6 +285,9 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
     /// </summary>
     public static string GuessKind(string version, string extension, IEnumerable<string>? libraryKinds = null)
     {
+        // No version: the file is named after the piece, which makes it the cover (the official cropped art).
+        if (string.IsNullOrWhiteSpace(version))
+            return NameRules.NormalizeExtension(extension) is ".psd" or ".kra" or ".procreate" or ".clip" or ".afphoto" or ".xcf" ? FileKind.Master : FileKind.Cover;
         var v = version.ToLowerInvariant();
         var custom = libraryKinds?
             .Where(k => !string.IsNullOrWhiteSpace(k))

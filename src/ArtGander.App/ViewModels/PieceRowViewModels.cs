@@ -19,7 +19,7 @@ public sealed partial class FileRowViewModel(FileEntry entry, string fullPath, b
     [ObservableProperty] public partial string EditVersion { get; set; } = entry.Version;
     [ObservableProperty] public partial ImageSource? Thumbnail { get; set; }
 
-    public bool VersionChanged => NameRules.ToVersionLabel(EditVersion) != Entry.Version;
+    public bool VersionChanged => FileNamer.Label(EditVersion) != Entry.Version;
     partial void OnEditVersionChanged(string value) => OnPropertyChanged(nameof(VersionChanged));
 
     public string SizeText

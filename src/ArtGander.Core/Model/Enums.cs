@@ -13,6 +13,8 @@ public sealed class CamelCaseEnumConverter<TEnum>() : JsonStringEnumConverter<TE
 /// </summary>
 public static class FileKind
 {
+    /// <summary>The official, fully cropped art: the file named after the piece without a version.</summary>
+    public const string Cover = "cover";
     public const string Photo = "photo";
     public const string Scan = "scan";
     public const string Master = "master";
@@ -22,7 +24,7 @@ public static class FileKind
     public const string Mockup = "mockup";
     public const string Other = "other";
 
-    public static IReadOnlyList<string> Defaults { get; } = [Photo, Scan, Master, Edit, Transparent, Print, Mockup, Other];
+    public static IReadOnlyList<string> Defaults { get; } = [Cover, Photo, Scan, Master, Edit, Transparent, Print, Mockup, Other];
 }
 
 [JsonConverter(typeof(CamelCaseEnumConverter<ItemType>))]

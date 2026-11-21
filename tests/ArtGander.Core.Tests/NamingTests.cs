@@ -57,10 +57,27 @@ public class NamingTests
 
     [Theory]
     [InlineData("Goose On The Loose - Transparent.png", "transparent")]
-    [InlineData("Goose On The Loose.jpg", "original")]
+    [InlineData("Goose On The Loose.jpg", "")] // just the title: the cover
     [InlineData("IMG_1234.jpg", "img-1234")]
     public void Suggests_versions_for_foreign_names(string fileName, string expected) =>
         Assert.Equal(expected, FileNamer.SuggestVersion("Goose On The Loose", fileName));
+
+    [Fact]
+    public void A_file_named_after_the_piece_is_the_cover()
+    {
+        Assert.True(FileNamer.FollowsConvention("Goose On The Loose", "Goose_On_The_Loose.png"));
+        Assert.True(FileNamer.TryParseVersion("Goose On The Loose", "Goose_On_The_Loose.png", out var version));
+        Assert.Equal("", version);
+        Assert.Equal("Goose_On_The_Loose.png", FileNamer.Build("Goose On The Loose", "", ".PNG"));
+        Assert.False(FileNamer.FollowsConvention("Goose On The Loose", "Goose On The Loose.png")); // spaces: fixable, becomes the cover
+        Assert.Equal(Model.FileKind.Cover, Services.PieceService.GuessKind("", ".png"));
+        Assert.Equal(Model.FileKind.Master, Services.PieceService.GuessKind("", ".psd"));
+
+        // A second cover in the same format gets a version instead of overwriting the first.
+        var taken = new HashSet<string> { "Goose.png" };
+        Assert.Equal("", FileNamer.MakeUnique("Goose", "", ".jpg", taken.Contains));
+        Assert.Equal("cover", FileNamer.MakeUnique("Goose", "", ".png", taken.Contains));
+    }
 
     [Fact]
     public void Makes_unique_versions()

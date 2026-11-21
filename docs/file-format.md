@@ -21,6 +21,7 @@ ArtGander treats **the file system as the source of truth**. There is no central
   Goose On The Loose/                    one folder per art piece (the folder name comes from the title)
     .artgander.json                       all details about this piece
     .artgander.json.v1.bak                backup made automatically when the file format was upgraded
+    Goose_On_The_Loose.png               {Art_Piece_Name}.{ext}: the cover, the official fully cropped art (no version)
     Goose_On_The_Loose-photo.jpg         {Art_Piece_Name}-{version}.{ext}
     Goose_On_The_Loose-master.tif
     Goose_On_The_Loose-transparent.png
@@ -37,6 +38,7 @@ The library may sit on a network share used by both Windows and macOS, so the st
 | File prefix | The folder name with spaces turned into `_` | `Goose_On_the_Loose` |
 | Version | Lowercase letters and digits, other characters become `-` | `Print A4 (v2)` → `print-a4-v2` |
 | Extension | Lowercase | `.JPG` → `.jpg` |
+| Cover | No version at all: the official, fully cropped art. It gets the kind "cover" and is the piece's or project's picture everywhere. A file named just after the piece in another form (e.g. `Goose On The Loose.png`) becomes the cover when its name is fixed. | `Goose_On_The_Loose.png` |
 
 Name comparisons ignore case and Unicode normalization, because Windows and most macOS volumes are case-insensitive and macOS SMB clients may write decomposed (NFD) names.
 
