@@ -19,20 +19,53 @@
     <!-- The menu: plain buttons, so a click always navigates, also on the page you're already in
          (e.g. Library while an art piece is open goes back to the Library). -->
     <Shell.FlyoutContent>
-        <VerticalStackLayout x:Name="Menu" Padding="8,0" Spacing="2" BindableLayout.ItemsSource="{Binding MenuEntries, Source={x:Reference ShellRoot}, x:DataType=local:AppShell}">
+        <VerticalStackLayout x:Name="Menu" Padding="{OnPlatform WinUI='4,0', MacCatalyst='10,0'}" Spacing="{OnPlatform WinUI=2, MacCatalyst=1}" BindableLayout.ItemsSource="{Binding MenuEntries, Source={x:Reference ShellRoot}, x:DataType=local:AppShell}">
             <BindableLayout.ItemTemplate>
                 <DataTemplate x:DataType="local:MenuEntry">
-                    <Button Text="{Binding Title}" HorizontalOptions="Fill" Padding="12,8" CornerRadius="6"
-                            BackgroundColor="Transparent" BorderWidth="0"
-                            TextColor="{AppThemeBinding Light=Black, Dark=White}"
-                            Command="{Binding NavigateCommand, Source={x:Reference ShellRoot}, x:DataType=local:AppShell}" CommandParameter="{Binding Route}">
-                        <Button.Triggers>
-                            <DataTrigger TargetType="Button" Binding="{Binding IsCurrent}" Value="True">
-                                <Setter Property="BackgroundColor" Value="{StaticResource Pond}" />
-                                <Setter Property="TextColor" Value="White" />
+                    <!-- Looks like the system sidebar: left-aligned text, a hover highlight, and the selected page marked
+                         with a subtle background and accent bar (Windows) or a rounded accent background (macOS). -->
+                    <Border StrokeThickness="0" StrokeShape="RoundRectangle 5" BackgroundColor="Transparent"
+                            HeightRequest="{OnPlatform WinUI=36, MacCatalyst=28}" Padding="{OnPlatform WinUI='8,0', MacCatalyst='10,0'}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NavigateCommand, Source={x:Reference ShellRoot}, x:DataType=local:AppShell}" CommandParameter="{Binding Route}" />
+                        </Border.GestureRecognizers>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroupList>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#0A000000, Dark=#0FFFFFFF}" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateGroupList>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsCurrent}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{OnPlatform WinUI={AppThemeBinding Light=#0F000000, Dark=#15FFFFFF}, MacCatalyst={StaticResource Pond}}" />
                             </DataTrigger>
-                        </Button.Triggers>
-                    </Button>
+                        </Border.Triggers>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{OnPlatform WinUI=10, MacCatalyst=0}">
+                            <!-- Windows: the small accent bar of a selected navigation item -->
+                            <BoxView WidthRequest="{OnPlatform WinUI=3, MacCatalyst=0}" HeightRequest="16" CornerRadius="2" Color="{StaticResource Pond}"
+                                     VerticalOptions="Center" Opacity="0">
+                                <BoxView.Triggers>
+                                    <DataTrigger TargetType="BoxView" Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter Property="Opacity" Value="{OnPlatform WinUI=1, MacCatalyst=0}" />
+                                    </DataTrigger>
+                                </BoxView.Triggers>
+                            </BoxView>
+                            <Label Grid.Column="1" Text="{Binding Title}" VerticalOptions="Center" HorizontalOptions="Start" HorizontalTextAlignment="Start"
+                                   FontSize="{OnPlatform WinUI=14, MacCatalyst=13}" TextColor="{AppThemeBinding Light=#1A1A1A, Dark=#F0F0F0}">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter Property="TextColor" Value="{OnPlatform WinUI={AppThemeBinding Light=#1A1A1A, Dark=#F0F0F0}, MacCatalyst=White}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Grid>
+                    </Border>
                 </DataTemplate>
             </BindableLayout.ItemTemplate>
         </VerticalStackLayout>

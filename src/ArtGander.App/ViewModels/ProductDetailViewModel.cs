@@ -430,6 +430,7 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
     {
         if (!app.HasRoot || IsReadOnly) return false;
         Product.Name = Product.Name.Trim();
+        if (HtmlText.HasMarkup(Product.Description)) Product.Description = HtmlText.Clean(Product.Description);
         if (Product.Name.Length == 0) { await Dialogs.AlertAsync("Name missing", "Please give this product a name, e.g. \"Goose poster A3\"."); return false; }
         var tags = TagsText.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (!Product.Tags.SequenceEqual(tags)) { Product.Tags.Clear(); foreach (var t in tags) Product.Tags.Add(t); }

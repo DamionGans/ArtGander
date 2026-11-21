@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ArtGander.App.Views.DescriptionEditor"
+             x:Name="Root">
+    <VerticalStackLayout Spacing="4">
+        <!-- Toolbar: wraps the selected text in simple HTML, like the Printify and Shopify editors -->
+        <HorizontalStackLayout Spacing="4">
+            <Button Text="¶" ToolTipProperties.Text="Paragraph" Clicked="OnParagraph" Style="{StaticResource EditorTool}" />
+            <Button Text="B" FontAttributes="Bold" ToolTipProperties.Text="Bold" Clicked="OnBold" Style="{StaticResource EditorTool}" />
+            <Button Text="I" FontAttributes="Italic" ToolTipProperties.Text="Italic" Clicked="OnItalic" Style="{StaticResource EditorTool}" />
+            <Button Text="U" ToolTipProperties.Text="Underline" Clicked="OnUnderline" Style="{StaticResource EditorTool}" />
+            <Button Text="S" ToolTipProperties.Text="Strikethrough" Clicked="OnStrike" Style="{StaticResource EditorTool}" />
+            <Button Text="H" ToolTipProperties.Text="Heading" Clicked="OnHeading" Style="{StaticResource EditorTool}" />
+            <Button Text="• List" ToolTipProperties.Text="Bulleted list (one item per line)" Clicked="OnBullets" Style="{StaticResource EditorTool}" />
+            <Button Text="1. List" ToolTipProperties.Text="Numbered list (one item per line)" Clicked="OnNumbers" Style="{StaticResource EditorTool}" />
+            <Button Text="Link" ToolTipProperties.Text="Link" Clicked="OnLink" Style="{StaticResource EditorTool}" />
+            <Button Text="Clean up" ToolTipProperties.Text="Turn plain text into paragraphs and remove markup the shops don't support" Clicked="OnCleanUp" Style="{StaticResource EditorTool}" />
+            <Button x:Name="PreviewButton" Text="Preview" Clicked="OnTogglePreview" Style="{StaticResource EditorTool}" />
+        </HorizontalStackLayout>
+        <Editor x:Name="TextEditor" AutoSize="TextChanges" MinimumHeightRequest="120"
+                Text="{Binding Text, Source={x:Reference Root}, x:DataType=ContentView}" />
+        <Border x:Name="PreviewBox" Style="{StaticResource Card}" IsVisible="False">
+            <Label x:Name="PreviewLabel" TextType="Html" />
+        </Border>
+    </VerticalStackLayout>
+</ContentView>

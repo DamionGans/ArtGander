@@ -68,6 +68,13 @@
         <Setter Property="TextColor" Value="White" />
     </Style>
 
+    <!-- Small buttons in the description editor's toolbar -->
+    <Style x:Key="EditorTool" TargetType="Button">
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="MinimumWidthRequest" Value="32" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
     <!-- Column headers in tables: click to sort -->
     <Style x:Key="HeaderButton" TargetType="Button">
         <Setter Property="Padding" Value="0" />

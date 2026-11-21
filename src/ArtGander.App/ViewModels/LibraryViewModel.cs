@@ -588,7 +588,7 @@ public sealed partial class PieceItemViewModel(PieceFolder folder, PieceStats? s
     public DateTimeOffset? Changed => Folder.Document?.Piece.UpdatedAt;
     public string CreatedText => Created?.ToString("d") ?? "";
     public string ChangedText => Changed?.ToString("d") ?? "";
-    public string Description => Folder.Document?.Piece.Description is { Length: > 0 } d ? d.ReplaceLineEndings(" ") : "";
+    public string Description => Folder.Document?.Piece.Description is { Length: > 0 } d ? HtmlText.ToPlainText(d).ReplaceLineEndings(" ") : "";
     public string Title => Folder.Parent is null ? Folder.Title : Folder.DisplayPath;
     public string? PreviewSource => Folder.PreviewFilePath;
     public bool IsProject => Folder.IsProject;

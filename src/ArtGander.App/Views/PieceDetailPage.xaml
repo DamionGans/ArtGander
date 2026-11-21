@@ -106,7 +106,7 @@
                     <Picker ItemsSource="{x:Static vm:PieceDetailViewModel.WorkStatuses}" SelectedItem="{Binding Piece.Status}" WidthRequest="220" HorizontalOptions="Start"
                             ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
                     <Label Text="Description" Style="{StaticResource FieldLabel}" />
-                    <Editor Text="{Binding Piece.Description}" AutoSize="TextChanges" MinimumHeightRequest="120" Placeholder="Shown to buyers, e.g. in your shop listing" />
+                    <views:DescriptionEditor Text="{Binding Piece.Description}" IsEnabled="{Binding IsEditable}" />
                     <Label Text="Collections (comma-separated)" Style="{StaticResource FieldLabel}" />
                     <Entry Text="{Binding CollectionsText}" Placeholder="e.g. Birds, Summer 2026" />
                     <FlexLayout BindableLayout.ItemsSource="{Binding KnownCollections}" Wrap="Wrap" Margin="0,4,0,0">

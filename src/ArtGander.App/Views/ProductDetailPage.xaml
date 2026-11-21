@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             xmlns:views="clr-namespace:ArtGander.App.Views"
              xmlns:m="clr-namespace:ArtGander.Core.Model;assembly=ArtGander.Core"
              xmlns:s="clr-namespace:ArtGander.Core.Services;assembly=ArtGander.Core"
              xmlns:st="clr-namespace:ArtGander.Core.Storage;assembly=ArtGander.Core"
@@ -68,8 +69,8 @@
                 <Label Text="Printify products are made and shipped by Printify. All other types (self print, handmade, original) you make and ship yourselves." Style="{StaticResource Muted}" />
                 <Label Text="Format" Style="{StaticResource FieldLabel}" />
                 <Entry Text="{Binding Product.Variant}" Placeholder="e.g. A3 matte poster, 11oz mug" />
-                <Label Text="Description (shown in the shop)" Style="{StaticResource FieldLabel}" />
-                <Editor Text="{Binding Product.Description}" AutoSize="TextChanges" MinimumHeightRequest="120" />
+                <Label Text="Description (shown in the shop; simple HTML like the Printify editor: paragraphs, bold, italic, lists, links)" Style="{StaticResource FieldLabel}" />
+                <views:DescriptionEditor Text="{Binding Product.Description}" />
                 <Label Text="Tags (comma separated)" Style="{StaticResource FieldLabel}" />
                 <Entry Text="{Binding TagsText}" Placeholder="goose, pond, poster" />
                 <Label Text="Notes (only in ArtGander)" Style="{StaticResource FieldLabel}" />
