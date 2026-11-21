@@ -26,11 +26,25 @@ public class OrderTests
 
         var order = SalesReport.Orders([details], [product], [a]).Single();
 
-        Assert.Equal(25, order.Revenue);
+        Assert.Equal(20.2m, order.Revenue);        // 30 paid - 5 tax - 4.8 shipping the customer paid for
         Assert.Equal(9.6m, order.ProductionCost);
-        Assert.Equal(4.8m, order.Shipping);
-        Assert.Equal(9.6m, order.Profit); // 25 - 9.6 - 4.8 - 1
+        Assert.Equal(4.8m, order.Shipping);        // kept for bookkeeping…
+        Assert.Equal(10.6m, order.CostAndFees);    // …but not the artist's cost: 9.6 production + 1 fees
+        Assert.Equal(9.6m, order.Profit);          // 20.2 - 10.6
         Assert.Equal("USPS 9400 1", order.TrackingText);
+    }
+
+    [Fact]
+    public void Shipping_is_never_the_artists_cost()
+    {
+        // No amount paid entered: revenue is the item prices, and the shipping (paid by the customer) isn't subtracted.
+        var product = new Product { ProductionCost = 6 };
+        var order = new Order { ShippingCost = 4, ShippingTax = 1, Lines = { new OrderLine { ProductId = product.Id, Quantity = 1, UnitPrice = 20 } } };
+        var summary = SalesReport.Orders([order], [product], []).Single();
+        Assert.Equal(20, summary.Revenue);
+        Assert.Equal(5, summary.Shipping);
+        Assert.Equal(14, summary.Profit);
+        Assert.Equal(5, SalesReport.Totals([summary]).Shipping);
     }
 
     [Fact]

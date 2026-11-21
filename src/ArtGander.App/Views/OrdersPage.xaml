@@ -27,10 +27,10 @@
         <!-- Totals -->
         <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*,*,*,*" ColumnSpacing="10">
             <Border Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Orders" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Orders}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
-            <Border Grid.Column="1" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Revenue (excl. tax)" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Revenue, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
+            <Border Grid.Column="1" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Revenue (excl. tax, shipping)" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Revenue, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
             <Border Grid.Column="2" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Tax collected" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.TaxCollected, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
             <Border Grid.Column="3" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Production" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Cost, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
-            <Border Grid.Column="4" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Shipping" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Shipping, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
+            <Border Grid.Column="4" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Shipping (paid by customers)" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Shipping, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
             <Border Grid.Column="5" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="Fees" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Fees, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" /></VerticalStackLayout></Border>
             <Border Grid.Column="6" Style="{StaticResource Card}"><VerticalStackLayout><Label Text="{Binding Currency, StringFormat='Profit ({0})'}" Style="{StaticResource Muted}" /><Label Text="{Binding Totals.Profit, StringFormat='{0:N2}'}" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource Pond}, Dark={StaticResource PondLight}}" /></VerticalStackLayout></Border>
         </Grid>
@@ -43,7 +43,7 @@
             <Label Grid.Column="4" Text="Tracking" Style="{StaticResource FieldLabel}" />
             <Label Grid.Column="5" Text="Items" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
             <Label Grid.Column="6" Text="Revenue" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
-            <Label Grid.Column="7" Text="All costs" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
+            <Label Grid.Column="7" Text="Costs" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
             <Label Grid.Column="8" Text="Profit" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
         </Grid>
 

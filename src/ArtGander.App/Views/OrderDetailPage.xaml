@@ -93,6 +93,7 @@
                     <Label Text="Leave the production cost empty to use the products' own production costs." Style="{StaticResource Muted}" />
 
                     <Label Text="Shipping" Style="{StaticResource SectionTitle}" />
+                    <Label Text="The customer pays for shipping, so it isn't counted as your cost. It's kept here for your bookkeeping." Style="{StaticResource Muted}" />
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                         <VerticalStackLayout>
                             <Label Text="Shipping cost" Style="{StaticResource FieldLabel}" />

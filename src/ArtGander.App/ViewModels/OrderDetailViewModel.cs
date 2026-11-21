@@ -175,7 +175,7 @@ public sealed partial class OrderDetailViewModel(AppState app, Core.Integrations
     private void UpdateSummary()
     {
         var summary = SalesReport.Orders([Order], app.Catalog.All, app.Documents).Single();
-        Summary = $"Items {summary.ItemsTotal:N2} · paid {summary.Paid:N2} · revenue excl. tax {summary.Revenue:N2} · production {summary.ProductionCost:N2} · shipping {summary.Shipping:N2} · fees {summary.Fees:N2} · profit {summary.Profit:N2} {Currency}";
+        Summary = $"Items {summary.ItemsTotal:N2} · paid {summary.Paid:N2} · revenue (excl. tax and shipping) {summary.Revenue:N2} · production {summary.ProductionCost:N2} · shipping paid by the customer {summary.Shipping:N2} · fees {summary.Fees:N2} · profit {summary.Profit:N2} {Currency}";
     }
 
     partial void OnNewItemProductChanged(Product? value)

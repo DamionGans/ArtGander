@@ -205,7 +205,10 @@ Orders imported from Shopify and Printify are combined: a Printify order that fu
 }
 ```
 
-Profit per order = (amount paid − tax in it) − (production + production tax) − (shipping + shipping tax) − fees.
+The customer always pays for shipping, so shipping is passed through: it's recorded for bookkeeping but isn't the artist's revenue or cost.
+
+Profit per order = (amount paid − tax in it − shipping in it) − (production + production tax) − fees.
+Without an amount paid, revenue is the sum of the item prices (which don't include shipping).
 
 ## Working from several computers
 

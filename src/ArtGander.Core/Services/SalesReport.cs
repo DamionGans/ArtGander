@@ -33,9 +33,10 @@ public sealed record SaleRow(
 /// <summary>
 /// An order with its lines.
 /// <para>
-/// Money logic, kept simple:
-/// revenue = what the customer paid (or the sum of item prices) minus the tax in it;
-/// costs = production (the actual bill, or the products' costs) + production tax + shipping + shipping tax + fees.
+/// Money logic, kept simple. <b>The customer always pays for shipping</b>, so shipping is passed through: it isn't the
+/// artist's revenue nor cost, and is only kept for bookkeeping.
+/// revenue = what the customer paid minus the tax in it and minus the shipping in it (or the sum of item prices);
+/// costs = production (the actual bill, or the products' costs) + production tax + fees.
 /// </para>
 /// </summary>
 public sealed record OrderSummary(Order Details, IReadOnlyList<SaleRow> Lines)
@@ -50,13 +51,19 @@ public sealed record OrderSummary(Order Details, IReadOnlyList<SaleRow> Lines)
     /// <summary>What the customer paid, including tax and any shipping they were charged.</summary>
     public decimal Paid => Details.AmountPaid ?? ItemsTotal;
     public decimal TaxCollected => Details.AmountPaidTax ?? 0;
-    public decimal Revenue => Paid - TaxCollected;
+    /// <summary>
+    /// What the artist earns before costs: what the customer paid, without tax and without the shipping they paid for
+    /// (that money goes straight to the carrier). Without a paid amount, the item prices (which don't include shipping).
+    /// </summary>
+    public decimal Revenue => Paid - TaxCollected - (Details.AmountPaid is null ? 0 : Shipping);
 
     public decimal ProductionCost => (Details.ProductionCost ?? Lines.Sum(l => l.Cost)) + (Details.ProductionTax ?? 0);
+    /// <summary>Shipping (+ its tax). Paid by the customer: kept for bookkeeping, not counted as the artist's cost.</summary>
     public decimal Shipping => (Details.ShippingCost ?? 0) + (Details.ShippingTax ?? 0);
     public decimal Fees => Lines.Sum(l => l.Line.Fees);
     public decimal Cost => ProductionCost;
-    public decimal CostAndFees => ProductionCost + Shipping + Fees;
+    /// <summary>The artist's costs: production and fees. Shipping isn't included, because the customer paid it.</summary>
+    public decimal CostAndFees => ProductionCost + Fees;
     public decimal Profit => Revenue - CostAndFees;
 
     public string Customer => Details.Customer;
