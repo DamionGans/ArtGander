@@ -164,6 +164,7 @@ public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, I
             pLink.RemoteUpdatedAt = fresh.UpdatedAt;
             pLink.LastSyncedAt = now;
             pLink.PublishPending = published;
+            if (!skipped.Any(c => c.Channel == "printify")) pLink.NeedsReview = false;
         }
         if (s is not null && sLink is not null)
         {
@@ -180,6 +181,7 @@ public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, I
             sLink.RemoteUpdatedAt = fresh.UpdatedAt;
             sLink.LastSyncedAt = now;
             sLink.Handle = fresh.Handle;
+            if (!skipped.Any(c => c.Channel == "shopify")) sLink.NeedsReview = false;
             if (fresh.Url.Length > 0) sLink.Url = fresh.Url;
         }
 

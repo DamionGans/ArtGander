@@ -84,7 +84,8 @@ public static class SyncPlanner
                              && link.LastSyncedAt is { } at && DateTimeOffset.Now - at < PublishGrace;
 
         if (plan.Printify is { } p)
-            CompareChannel(plan, p, product.Channels.Printify!.Base, owner: true, includeStatus: false, includeStock: false, includeEnabled: true);
+            CompareChannel(plan, p, product.Channels.Printify!.Base, owner: true, includeStatus: false, includeStock: false, includeEnabled: true,
+                review: product.Channels.Printify.NeedsReview);
 
         if (plan.Shopify is { } s)
         {
@@ -94,29 +95,30 @@ public static class SyncPlanner
                 // Texts and prices go through Printify. Only report Shopify edits to them (a publish would overwrite those),
                 // and not while a publish is still on its way to Shopify.
                 if (!pendingPublish)
-                    CompareChannel(plan, s, baseSnap, owner: false, includeStatus: false, includeStock: false, includeEnabled: false);
-                CompareFields(plan, s, baseSnap, owner: true, onlyStatus: true);
+                    CompareChannel(plan, s, baseSnap, owner: false, includeStatus: false, includeStock: false, includeEnabled: false, review: false);
+                CompareFields(plan, s, baseSnap, owner: true, onlyStatus: true, review: product.Channels.Shopify.NeedsReview);
             }
             else
             {
-                CompareChannel(plan, s, baseSnap, owner: true, includeStatus: true, includeStock: true, includeEnabled: false);
+                CompareChannel(plan, s, baseSnap, owner: true, includeStatus: true, includeStock: true, includeEnabled: false,
+                    review: product.Channels.Shopify.NeedsReview);
             }
         }
     }
 
-    private static void CompareFields(ProductSyncPlan plan, RemoteProduct remote, SyncSnapshot? snap, bool owner, bool onlyStatus)
+    private static void CompareFields(ProductSyncPlan plan, RemoteProduct remote, SyncSnapshot? snap, bool owner, bool onlyStatus, bool review)
     {
-        if (onlyStatus) Add(plan, remote.Channel, "status", null, "Status", snap?.Status, StatusOf(plan.Product), remote.Status, owner);
+        if (onlyStatus) Add(plan, remote.Channel, "status", null, "Status", snap?.Status, StatusOf(plan.Product), remote.Status, owner, review: review);
     }
 
-    private static void CompareChannel(ProductSyncPlan plan, RemoteProduct remote, SyncSnapshot? snap, bool owner, bool includeStatus, bool includeStock, bool includeEnabled)
+    private static void CompareChannel(ProductSyncPlan plan, RemoteProduct remote, SyncSnapshot? snap, bool owner, bool includeStatus, bool includeStock, bool includeEnabled, bool review)
     {
         var product = plan.Product;
         var c = remote.Channel;
-        Add(plan, c, "title", null, "Title", snap?.Title, product.Name, remote.Title, owner);
-        Add(plan, c, "description", null, "Description", snap?.Description, product.Description, remote.Description, owner);
-        Add(plan, c, "tags", null, "Tags", Tags(snap?.Tags), Tags(product.Tags), Tags(remote.Tags), owner);
-        if (includeStatus) Add(plan, c, "status", null, "Status", snap?.Status, StatusOf(product), remote.Status, owner);
+        Add(plan, c, "title", null, "Title", snap?.Title, product.Name, remote.Title, owner, review: review);
+        Add(plan, c, "description", null, "Description", snap?.Description, product.Description, remote.Description, owner, review: review);
+        Add(plan, c, "tags", null, "Tags", Tags(snap?.Tags), Tags(product.Tags), Tags(remote.Tags), owner, review: review);
+        if (includeStatus) Add(plan, c, "status", null, "Status", snap?.Status, StatusOf(product), remote.Status, owner, review: review);
 
         foreach (var rv in remote.Variants)
         {
@@ -127,9 +129,9 @@ public static class SyncPlanner
             var label = local is null || string.IsNullOrEmpty(local.Title) ? "" : local.Title + " ";
             var localPrice = local is null ? product.Price : product.PriceOf(local);
             if (localPrice is not null)
-                Add(plan, c, "price", key, label + "price", Money(baseVariant?.Price), Money(localPrice), Money(rv.Price), owner);
+                Add(plan, c, "price", key, label + "price", Money(baseVariant?.Price), Money(localPrice), Money(rv.Price), owner, review: review);
             if (includeEnabled && local is not null)
-                Add(plan, c, "enabled", key, label + "on sale", Bool(baseVariant?.Enabled), Bool(local.Enabled), Bool(rv.Enabled), owner);
+                Add(plan, c, "enabled", key, label + "on sale", Bool(baseVariant?.Enabled), Bool(local.Enabled), Bool(rv.Enabled), owner, review: review);
             if (includeStock)
             {
                 var localStock = local?.Stock ?? (product.Variants.Count <= 1 ? product.Stock : null);
@@ -140,9 +142,15 @@ public static class SyncPlanner
     }
 
     private static void Add(ProductSyncPlan plan, string channel, string field, string? variant, string label,
-        string? baseValue, string? local, string? remote, bool owner, bool isStock = false)
+        string? baseValue, string? local, string? remote, bool owner, bool isStock = false, bool review = false)
     {
         if (Same(local, remote)) return;
+        if (review && !isStock)
+        {
+            // First sync after joining an existing ArtGander product: never decide for you.
+            plan.Changes.Add(new SyncFieldChange(channel, field, variant, label, baseValue, local, remote, SyncChangeKind.Conflict));
+            return;
+        }
         baseValue ??= remote; // never synced: treat the shop's current value as the starting point
         var localChanged = !Same(local, baseValue);
         var remoteChanged = !Same(remote, baseValue);

@@ -12,6 +12,8 @@ public sealed class ProductImportCandidate
     /// <summary>The ArtGander product it is already linked to, if any.</summary>
     public Product? Existing { get; init; }
     public List<Guid> SuggestedPieces { get; init; } = [];
+    /// <summary>Why the Printify and Shopify products (or an existing ArtGander product) were combined, for the preview.</summary>
+    public string MatchReason { get; init; } = "";
 
     public RemoteProduct Main => Printify ?? Shopify!;
     public string Title => Main.Title;
@@ -31,27 +33,104 @@ public sealed class ProductImportCandidate
 /// </summary>
 public static class ProductImporter
 {
+    /// <summary>
+    /// Pairs everything found in the shops, so the same product never becomes two:
+    /// <list type="number">
+    /// <item>A Printify product and the Shopify listing it was published as (Printify's <c>external.id</c>).</item>
+    /// <item>Otherwise a Printify product and a Shopify product with the same SKUs, or else the same title.</item>
+    /// <item>Each pair (or single product) and the ArtGander product already linked to it; otherwise an ArtGander product
+    /// that isn't linked to that shop yet and has the same SKUs or name (e.g. a product entered by hand before).</item>
+    /// </list>
+    /// </summary>
     public static List<ProductImportCandidate> Plan(IReadOnlyList<RemoteProduct> printify, IReadOnlyList<RemoteProduct> shopify,
         IReadOnlyList<Product> existing, IEnumerable<ArtPieceDocument> docs)
     {
-        var pieces = docs.Where(d => !d.Piece.IsProject || true).ToList();
+        var pieces = docs.ToList();
         var result = new List<ProductImportCandidate>();
         var pairedShopify = new HashSet<string>();
+        var claimed = new HashSet<Guid>(); // ArtGander products already matched by an earlier candidate
 
+        // 1. Pairs that Printify itself knows about.
+        var pairs = new List<(RemoteProduct P, RemoteProduct? S, string Reason)>();
+        var unpaired = new List<RemoteProduct>();
         foreach (var p in printify)
         {
             var s = p.ExternalId is { } ext ? shopify.FirstOrDefault(x => Ids.SameShopifyId(x.Id, ext)) : null;
-            if (s is not null) pairedShopify.Add(s.Id);
-            var match = existing.FirstOrDefault(e => e.Channels.Printify?.ProductId == p.Id)
-                        ?? (s is null ? null : existing.FirstOrDefault(e => Ids.SameShopifyId(e.Channels.Shopify?.ProductId, s.Id)));
-            result.Add(new ProductImportCandidate { Printify = p, Shopify = s, Existing = match, SuggestedPieces = Suggest(p, match, pieces) });
+            if (s is null) { unpaired.Add(p); continue; }
+            pairedShopify.Add(s.Id);
+            pairs.Add((p, s, "published from Printify"));
+        }
+        // 2. Same SKUs, then the same title, among what's left.
+        foreach (var p in unpaired)
+        {
+            var free = shopify.Where(s => !pairedShopify.Contains(s.Id)).ToList();
+            var s = free.FirstOrDefault(x => SameSkus(p, x)) is { } bySku ? (bySku, "same SKUs")
+                : free.Where(x => SameTitle(p.Title, x.Title)).ToList() is [var byTitle] ? (byTitle, "same title")
+                : ((RemoteProduct?)null, "");
+            if (s.Item1 is not null) pairedShopify.Add(s.Item1.Id);
+            pairs.Add((p, s.Item1, s.Item2));
+        }
+
+        foreach (var (p, s, reason) in pairs)
+        {
+            var (match, why) = FindExisting(existing, claimed, p, s);
+            result.Add(new ProductImportCandidate
+            {
+                Printify = p, Shopify = s, Existing = match, SuggestedPieces = Suggest(p, match, pieces),
+                MatchReason = string.Join(" · ", new[] { s is null ? "" : "Printify + Shopify: " + reason, why }.Where(x => x.Length > 0)),
+            });
         }
         foreach (var s in shopify.Where(s => !pairedShopify.Contains(s.Id)))
         {
-            var match = existing.FirstOrDefault(e => Ids.SameShopifyId(e.Channels.Shopify?.ProductId, s.Id));
-            result.Add(new ProductImportCandidate { Shopify = s, Existing = match, SuggestedPieces = Suggest(s, match, pieces) });
+            var (match, why) = FindExisting(existing, claimed, null, s);
+            result.Add(new ProductImportCandidate { Shopify = s, Existing = match, SuggestedPieces = Suggest(s, match, pieces), MatchReason = why });
         }
         return result.OrderBy(c => c.IsUpToDate).ThenBy(c => c.Title, Naming.NameRules.NaturalComparer).ToList();
+    }
+
+    private static (Product? Product, string Reason) FindExisting(IReadOnlyList<Product> existing, HashSet<Guid> claimed, RemoteProduct? p, RemoteProduct? s)
+    {
+        Product? Claim(Product? x) { if (x is not null) claimed.Add(x.Id); return x; }
+
+        // Already linked.
+        if (Claim(existing.FirstOrDefault(e => p is not null && e.Channels.Printify?.ProductId == p.Id)
+                  ?? existing.FirstOrDefault(e => s is not null && Ids.SameShopifyId(e.Channels.Shopify?.ProductId, s.Id))) is { } linked)
+            return (linked, "");
+
+        // Not linked yet: a product entered in ArtGander by hand (or from an older version) that's clearly the same one.
+        var open = existing.Where(e => !claimed.Contains(e.Id)
+                                       && (p is null || !e.IsOnPrintify)
+                                       && (s is null || !e.IsOnShopify)).ToList();
+        var remote = p ?? s!;
+        if (open.FirstOrDefault(e => SameSkus(e, remote) || (s is not null && SameSkus(e, s))) is { } bySku)
+            return (Claim(bySku), $"joins your product \"{bySku.Name}\" (same SKUs)");
+        if (open.Where(e => SameTitle(e.Name, remote.Title) || (s is not null && SameTitle(e.Name, s.Title))).ToList() is [var byName])
+            return (Claim(byName), $"joins your product \"{byName.Name}\" (same name)");
+        return (null, "");
+    }
+
+    private static HashSet<string> Skus(IEnumerable<string> skus) =>
+        skus.Select(s => s.Trim()).Where(s => s.Length > 0).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static bool SameSkus(RemoteProduct a, RemoteProduct b)
+    {
+        var x = Skus(a.EnabledVariants.Select(v => v.Sku));
+        var y = Skus(b.EnabledVariants.Select(v => v.Sku));
+        return x.Count > 0 && y.Count > 0 && x.Overlaps(y);
+    }
+
+    private static bool SameSkus(Product a, RemoteProduct b)
+    {
+        var x = Skus(a.Variants.Select(v => v.Sku));
+        var y = Skus(b.EnabledVariants.Select(v => v.Sku));
+        return x.Count > 0 && y.Count > 0 && x.Overlaps(y);
+    }
+
+    /// <summary>Titles match when their words are the same, ignoring case, punctuation and word order.</summary>
+    private static bool SameTitle(string a, string b)
+    {
+        var x = Words(a);
+        return x.Count > 0 && x.SetEquals(Words(b));
     }
 
     /// <summary>Suggests the art piece(s) a product shows: the piece whose title appears in the product title (longest wins).</summary>
@@ -81,9 +160,11 @@ public static class ProductImporter
         var product = c.Existing ?? NewProduct(c, currency);
         foreach (var id in pieces) if (!product.Pieces.Contains(id)) product.Pieces.Add(id);
 
+        var joined = c.Existing is not null;
         if (c.Printify is { } p)
         {
             MapVariants(product, p);
+            if (joined && !product.IsOnPrintify) (product.Channels.Printify ??= new PrintifyLink()).NeedsReview = true;
             product.Channels.Printify ??= new PrintifyLink();
             var link = product.Channels.Printify;
             link.ProductId = p.Id;
@@ -97,6 +178,7 @@ public static class ProductImporter
         if (c.Shopify is { } s)
         {
             MapVariants(product, s);
+            if (joined && !product.IsOnShopify) (product.Channels.Shopify ??= new ShopifyLink()).NeedsReview = true;
             product.Channels.Shopify ??= new ShopifyLink();
             var link = product.Channels.Shopify;
             link.ProductId = s.Id;

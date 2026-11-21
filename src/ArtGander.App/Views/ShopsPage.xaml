@@ -100,10 +100,11 @@
 
             <!-- ============ PRODUCTS ============ -->
             <Label Text="Products" Style="{StaticResource SectionTitle}" />
-            <Label Text="Printify products published to Shopify become one ArtGander product with both links. Pick the art piece each one shows (suggested from the title). Products already in ArtGander keep their ArtGander texts and prices."
+            <Label Text="Everything in Printify and Shopify, combined where it's the same product: a Printify product and the Shopify listing it was published as (or with the same SKUs or title) become one ArtGander product with both links, and products you already have in ArtGander are joined instead of duplicated. The art piece of each is suggested from the title. Nothing in the shops changes."
                    Style="{StaticResource Muted}" />
             <HorizontalStackLayout Spacing="8">
-                <Button Text="Find products in the shops" Command="{Binding FetchProductsCommand}" />
+                <Button Text="Import all products" Command="{Binding ImportAllProductsCommand}" Style="{StaticResource TabButtonSelected}" />
+                <Button Text="Find products and choose" Command="{Binding FetchProductsCommand}" />
                 <Button Text="Select all / none" Command="{Binding SelectAllProductsCommand}" IsVisible="{Binding HasProductRows}" />
                 <Button Text="Import selected products" Command="{Binding ImportProductsCommand}" IsVisible="{Binding HasProductRows}" Style="{StaticResource TabButtonSelected}" />
             </HorizontalStackLayout>

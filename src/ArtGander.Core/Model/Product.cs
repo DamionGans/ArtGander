@@ -155,6 +155,11 @@ public abstract class ChannelLink : ModelBase
     public DateTimeOffset? LastSyncedAt { get; set; }
     /// <summary>The values both sides agreed on at the last sync.</summary>
     public SyncSnapshot? Base { get; set; }
+    /// <summary>
+    /// Set when an existing ArtGander product was connected to a shop product: they never agreed on anything yet, so every
+    /// difference is shown as a choice in the next sync instead of being sent automatically.
+    /// </summary>
+    public bool NeedsReview { get; set; }
 }
 
 public sealed class PrintifyLink : ChannelLink

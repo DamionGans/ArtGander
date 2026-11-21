@@ -27,7 +27,8 @@ public sealed partial class ProductImportRow : ObservableObject
         Candidate.Where,
         $"{Candidate.Main.EnabledVariants.Count()} variant(s)",
         Candidate.IsUpToDate ? "already in ArtGander" : Candidate.IsNew ? "new" : "connects to \"" + Candidate.Existing!.Name + "\"",
-    });
+        Candidate.MatchReason,
+    }.Where(x => x.Length > 0));
     [ObservableProperty] public partial bool Include { get; set; }
     [ObservableProperty] public partial ArtPieceDocument? Piece { get; set; }
 }
@@ -214,6 +215,28 @@ public sealed partial class ShopsViewModel(AppState app, ImportService import) :
         }
         catch (Exception ex) { Status = "Import failed: " + ex.Message; }
         finally { IsBusy = false; OnPropertyChanged(nameof(HasProductRows)); }
+    }
+
+    /// <summary>Finds everything in both shops and imports all of it in one go (combining what belongs together).</summary>
+    [RelayCommand]
+    private void ImportAllProducts() => Ui.Fire(ImportAllProductsAsync);
+
+    private async Task ImportAllProductsAsync()
+    {
+        if (!app.HasRoot || IsBusy) return;
+        if (ProductRows.Count == 0) await FetchProductsAsync();
+        var todo = ProductRows.Where(r => !r.Candidate.IsUpToDate).ToList();
+        if (todo.Count == 0) { Status = "All products from the shops are already in ArtGander."; return; }
+        var combined = todo.Count(r => r.Candidate.Printify is not null && r.Candidate.Shopify is not null);
+        var joined = todo.Count(r => !r.Candidate.IsNew);
+        var withoutPiece = todo.Count(r => r.Piece is null);
+        if (!await Dialogs.ConfirmAsync("Import all products?",
+                $"{todo.Count} product(s) are imported: {combined} combined from Printify + Shopify, {joined} joined to products you already have in ArtGander."
+                + (withoutPiece > 0 ? $" {withoutPiece} have no art piece yet; you can link them later on the product page." : "")
+                + " Nothing in the shops changes.", "Import all"))
+            return;
+        foreach (var r in ProductRows) r.Include = !r.Candidate.IsUpToDate;
+        await ImportProductsAsync();
     }
 
     [RelayCommand]

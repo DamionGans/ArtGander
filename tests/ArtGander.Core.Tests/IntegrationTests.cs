@@ -171,6 +171,50 @@ public class IntegrationTests
         Assert.True(Assert.Single(again).IsUpToDate);
     }
 
+    [Fact]
+    public void Same_products_are_combined_even_without_a_Printify_link()
+    {
+        RemoteProduct P(string id, string title, string sku) => new()
+        {
+            Channel = "printify", Id = id, Title = title, Variants = [new RemoteVariant { Id = id + "1", Sku = sku, Price = 20, Enabled = true }],
+        };
+        RemoteProduct S(string id, string title, string sku) => new()
+        {
+            Channel = "shopify", Id = "gid://shopify/Product/" + id, Title = title, Variants = [new RemoteVariant { Id = "gid://shopify/ProductVariant/" + id, Sku = sku, Price = 20 }],
+        };
+        var printify = new[] { P("a", "Goose mug", "MUG-1"), P("b", "Swan Tote Bag", "TOTE-9"), P("c", "Duck sticker", "ST-1") };
+        var shopify = new[] { S("1", "Big goose mug 11oz", "MUG-1"), S("2", "swan tote bag!", "OTHER"), S("3", "Hand-painted goose", "") };
+        var handMade = new Product { Name = "Hand painted goose" }; // entered in ArtGander before
+
+        var plan = ProductImporter.Plan(printify, shopify, [handMade], []);
+
+        Assert.Equal(4, plan.Count);
+        Assert.Equal("gid://shopify/Product/1", plan.Single(c => c.Printify?.Id == "a").Shopify?.Id); // same SKU
+        Assert.Equal("gid://shopify/Product/2", plan.Single(c => c.Printify?.Id == "b").Shopify?.Id); // same title
+        Assert.Null(plan.Single(c => c.Printify?.Id == "c").Shopify);
+        var joined = plan.Single(c => c.Shopify?.Id == "gid://shopify/Product/3");
+        Assert.Same(handMade, joined.Existing);
+        Assert.Contains("same name", joined.MatchReason);
+    }
+
+    [Fact]
+    public void The_first_sync_after_joining_an_existing_product_asks_instead_of_sending()
+    {
+        var mine = new Product { Name = "Goose poster", Price = 22m };
+        var shop = new RemoteProduct
+        {
+            Channel = "shopify", Id = "gid://shopify/Product/5", Title = "Goose poster", Description = "From the shop", Status = "active", UpdatedAt = "s1",
+            Variants = [new RemoteVariant { Id = "gid://shopify/ProductVariant/5", Title = "Default Title", Price = 25m }],
+        };
+        var candidate = Assert.Single(ProductImporter.Plan([], [shop], [mine], []));
+        ProductImporter.Apply(candidate, [], "EUR");
+        Assert.True(mine.Channels.Shopify!.NeedsReview);
+
+        var plan = Assert.Single(SyncPlanner.Plan([mine], [], [shop]));
+        Assert.NotEmpty(plan.Changes);
+        Assert.All(plan.Changes, c => Assert.Equal(SyncChangeKind.Conflict, c.Kind)); // nothing is sent unless you choose
+    }
+
     private static RemoteOrder ShopifyOrder(string updated = "2026-11-02T10:00:00Z") => new()
     {
         Channel = "shopify", Id = "gid://shopify/Order/555", Name = "#1001", CreatedAt = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero),

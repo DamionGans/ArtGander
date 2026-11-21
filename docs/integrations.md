@@ -33,6 +33,20 @@ Since 2026, Shopify gives API access through an app in the **Shopify Dev Dashboa
 
 ArtGander gets a fresh access token automatically (they last 24 hours).
 
+## Importing everything
+
+On the **Shops** page, **Import all products** reads every product in Printify and Shopify and imports them in one go.
+The same product is never imported twice:
+
+* A Printify product and the Shopify listing it was published as become one ArtGander product with both links.
+  Without that link, a Printify and a Shopify product with the same SKUs (or else the same title) are combined too.
+* A product you already have in ArtGander (entered by hand, or from an older ArtGander) with the same SKUs or name is
+  joined instead of duplicated. In the first sync after that, every difference between the two is shown as a choice;
+  nothing is sent automatically.
+* The art piece each product shows is suggested from its title; you can change it later on the product page.
+
+Use **Find products and choose** to pick products one by one instead.
+
 ## How syncing stays safe
 
 * **Reading never changes anything.** Finding products and checking orders only reads.
