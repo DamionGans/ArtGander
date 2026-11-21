@@ -22,6 +22,7 @@
             <conv:SelectLabelConverter x:Key="SelectLabel" />
             <conv:CheckMarkConverter x:Key="CheckMark" />
             <conv:SortArrowConverter x:Key="SortArrow" />
+            <conv:KeepValueConverter x:Key="KeepValue" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

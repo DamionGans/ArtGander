@@ -58,4 +58,7 @@ public partial class PieceDetailPage : ContentPage
         ViewModel.Tab = "files";
         await ViewModel.ImportPathsAsync(files);
     }
+
+    /// <summary>The Back button on the page (the bar at the top is hidden). Unsaved changes are asked about first.</summary>
+    private void OnBackClicked(object? sender, EventArgs e) => Services.Ui.Fire(() => Shell.Current.GoToAsync(".."));
 }

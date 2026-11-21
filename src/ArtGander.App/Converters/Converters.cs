@@ -146,3 +146,13 @@ public sealed class SortArrowConverter : IValueConverter
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is true ? "▼" : "▲";
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }
+
+/// <summary>
+/// For pickers bound to text: a picker reports "nothing selected" when the value isn't in its list, which would wipe
+/// the value (and make the page look changed). This keeps the value instead.
+/// </summary>
+public sealed class KeepValueConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value;
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => value ?? Binding.DoNothing;
+}

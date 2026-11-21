@@ -45,7 +45,10 @@ public sealed partial class OrderLineRow : ObservableObject
 public sealed partial class OrderDetailViewModel(AppState app, Core.Integrations.FulfillmentService fulfillment) : ObservableObject, IQueryAttributable
 {
     public static IReadOnlyList<OrderStatus> Statuses { get; } = Enum.GetValues<OrderStatus>();
-    public static IReadOnlyList<string> CarrierOptions { get; } = Carriers.Known;
+    /// <summary>The known delivery providers, plus this order's own one (e.g. imported from Printify) if it isn't in the list.</summary>
+    public IReadOnlyList<string> CarrierOptions => Order.Carrier is { Length: > 0 } c && !Carriers.Known.Contains(c, StringComparer.OrdinalIgnoreCase)
+        ? [.. Carriers.Known, c]
+        : Carriers.Known;
     public static IReadOnlyList<Fulfillment> Fulfillments { get; } = Enum.GetValues<Fulfillment>();
 
     private string _savedJson = "";
@@ -78,6 +81,9 @@ public sealed partial class OrderDetailViewModel(AppState app, Core.Integrations
     public bool HasVariants => ProductVariants.Count > 0;
 
     public bool HasUnsavedChanges => ArtGanderJson.Serialize(Order) != _savedJson;
+#if DEBUG
+    public string SavedJsonForTest => _savedJson;
+#endif
 
     /// <summary>A Shopify order with items you ship yourselves can be marked as shipped in Shopify from here.</summary>
     public bool CanMarkShipped => Order.Sources.Shopify is not null && Order.Lines.Any(l => l.Fulfillment == Fulfillment.Self && l.ShopifyLineId is not null);
@@ -121,6 +127,7 @@ public sealed partial class OrderDetailViewModel(AppState app, Core.Integrations
         IsLeaveConfirmed = false;
         Order.PropertyChanged += (_, _) => UpdateSummary();
         OnPropertyChanged(nameof(SourceText));
+        OnPropertyChanged(nameof(CarrierOptions));
         OnPropertyChanged(nameof(CanMarkShipped));
 
         Products.Clear();

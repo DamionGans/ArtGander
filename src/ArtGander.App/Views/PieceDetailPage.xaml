@@ -8,7 +8,8 @@
              x:Class="ArtGander.App.Views.PieceDetailPage"
              x:Name="Root"
              x:DataType="vm:PieceDetailViewModel"
-             Title="{Binding EditTitle}">
+             Title="{Binding EditTitle}"
+             Shell.NavBarIsVisible="False">
 
     <ContentPage.MenuBarItems>
         <MenuBarItem Text="File">
@@ -42,7 +43,8 @@
             </Border>
             <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
                 <HorizontalStackLayout Spacing="8">
-                    <Button Text="{Binding ParentTitle, StringFormat='‹ Part of: {0}'}" Command="{Binding OpenParentCommand}" IsVisible="{Binding HasParent}"
+                    <Button Text="‹ Back" Clicked="OnBackClicked" HorizontalOptions="Start" Padding="10,2" FontSize="13" />
+                    <Button Text="{Binding ParentTitle, StringFormat='Part of: {0}'}" Command="{Binding OpenParentCommand}" IsVisible="{Binding HasParent}"
                             FontSize="12" Padding="8,2" />
                     <Label Text="PROJECT" IsVisible="{Binding IsProject}" FontSize="11" FontAttributes="Bold" VerticalOptions="Center"
                            TextColor="{AppThemeBinding Light={StaticResource Pond}, Dark={StaticResource PondLight}}" />
@@ -223,7 +225,7 @@
                                     </VerticalStackLayout>
                                     <VerticalStackLayout Grid.Column="2" VerticalOptions="Center">
                                         <Label Text="Kind" Style="{StaticResource FieldLabel}" Margin="0" />
-                                        <Picker ItemsSource="{Binding FileKinds, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" SelectedItem="{Binding Entry.Kind}"
+                                        <Picker ItemsSource="{Binding FileKinds, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" SelectedItem="{Binding Entry.Kind, Converter={StaticResource KeepValue}}"
                                                 ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
                                     </VerticalStackLayout>
                                     <HorizontalStackLayout Grid.Column="3" Spacing="6" VerticalOptions="Center">
@@ -245,7 +247,7 @@
                                 <Grid ColumnDefinitions="*,200,160,Auto" ColumnSpacing="10">
                                     <Label Text="{Binding FileName}" VerticalOptions="Center" LineBreakMode="MiddleTruncation" />
                                     <Entry Grid.Column="1" Text="{Binding Version}" Placeholder="version" />
-                                    <Picker Grid.Column="2" ItemsSource="{Binding FileKinds, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" SelectedItem="{Binding Kind}"
+                                    <Picker Grid.Column="2" ItemsSource="{Binding FileKinds, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" SelectedItem="{Binding Kind, Converter={StaticResource KeepValue}}"
                                             ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
                                     <HorizontalStackLayout Grid.Column="3" Spacing="6">
                                         <Button Text="Track &amp; rename" Command="{Binding TrackFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />

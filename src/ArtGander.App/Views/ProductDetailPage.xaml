@@ -8,7 +8,8 @@
              xmlns:ci="clr-namespace:ArtGander.Core.Integrations;assembly=ArtGander.Core"
              x:Class="ArtGander.App.Views.ProductDetailPage"
              x:DataType="vm:ProductDetailViewModel"
-             Title="{Binding Product.Name}">
+             Title="{Binding Product.Name}"
+             Shell.NavBarIsVisible="False">
 
     <ContentPage.MenuBarItems>
         <MenuBarItem Text="File">
@@ -23,6 +24,7 @@
     <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="24,16,24,0" RowSpacing="10">
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                <Button Text="‹ Back" Clicked="OnBackClicked" HorizontalOptions="Start" Padding="10,2" FontSize="13" />
                 <Label Text="PRODUCT" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource Pond}, Dark={StaticResource PondLight}}" />
                 <Entry Text="{Binding Product.Name}" FontSize="22" FontAttributes="Bold" Placeholder="Product name, e.g. Goose poster A3" IsReadOnly="{Binding IsReadOnly}" />
             </VerticalStackLayout>
@@ -279,7 +281,7 @@
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="m:Listing">
                             <Grid ColumnDefinitions="130,*,100,110,Auto,Auto" ColumnSpacing="8">
-                                <Picker ItemsSource="{Binding Channels, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" SelectedItem="{Binding Channel}" />
+                                <Picker ItemsSource="{Binding Channels, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" SelectedItem="{Binding Channel, Converter={StaticResource KeepValue}}" />
                                 <Entry Grid.Column="1" Text="{Binding Url}" Placeholder="Listing URL" />
                                 <Entry Grid.Column="2" Text="{Binding Price, Converter={StaticResource NullableDecimal}}" Placeholder="Price" Keyboard="Numeric" />
                                 <Picker Grid.Column="3" ItemsSource="{x:Static vm:ProductDetailViewModel.ListingStatuses}" SelectedItem="{Binding Status}"

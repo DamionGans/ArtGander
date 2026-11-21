@@ -6,7 +6,8 @@
              xmlns:m="clr-namespace:ArtGander.Core.Model;assembly=ArtGander.Core"
              x:Class="ArtGander.App.Views.OrderDetailPage"
              x:DataType="vm:OrderDetailViewModel"
-             Title="{Binding Order.OrderRef, StringFormat='Order {0}'}">
+             Title="{Binding Order.OrderRef, StringFormat='Order {0}'}"
+             Shell.NavBarIsVisible="False">
 
     <ContentPage.MenuBarItems>
         <MenuBarItem Text="File">
@@ -22,6 +23,7 @@
         <VerticalStackLayout Padding="24,16,24,32" Spacing="4">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <VerticalStackLayout VerticalOptions="Center">
+                    <Button Text="‹ Back" Clicked="OnBackClicked" HorizontalOptions="Start" Padding="10,2" FontSize="13" />
                     <Label Text="{Binding Order.OrderRef, StringFormat='Order {0}'}" Style="{StaticResource PageTitle}" />
                     <Label Text="{Binding Summary}" Style="{StaticResource Muted}" />
                 </VerticalStackLayout>
@@ -48,7 +50,7 @@
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                         <VerticalStackLayout>
                             <Label Text="Channel" Style="{StaticResource FieldLabel}" />
-                            <Picker ItemsSource="{Binding Channels}" SelectedItem="{Binding Order.Channel}" />
+                            <Picker ItemsSource="{Binding Channels}" SelectedItem="{Binding Order.Channel, Converter={StaticResource KeepValue}}" />
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1">
                             <Label Text="Status" Style="{StaticResource FieldLabel}" />
@@ -104,7 +106,7 @@
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                         <VerticalStackLayout>
                             <Label Text="Delivery provider" Style="{StaticResource FieldLabel}" />
-                            <Picker ItemsSource="{x:Static vm:OrderDetailViewModel.CarrierOptions}" SelectedItem="{Binding Order.Carrier}" />
+                            <Picker ItemsSource="{Binding CarrierOptions}" SelectedItem="{Binding Order.Carrier, Converter={StaticResource KeepValue}}" />
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1">
                             <Label Text="Shipped on" Style="{StaticResource FieldLabel}" />

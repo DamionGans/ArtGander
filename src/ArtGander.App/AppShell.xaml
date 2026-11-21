@@ -2,7 +2,9 @@
 <Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
        xmlns:views="clr-namespace:ArtGander.App.Views"
+       xmlns:local="clr-namespace:ArtGander.App"
        x:Class="ArtGander.App.AppShell"
+       x:Name="ShellRoot"
        Title="ArtGander"
        FlyoutBehavior="Locked"
        FlyoutWidth="200">
@@ -13,6 +15,28 @@
             <Label Text="Artistic Goose On The Loose" Style="{StaticResource Muted}" FontSize="11" />
         </VerticalStackLayout>
     </Shell.FlyoutHeader>
+
+    <!-- The menu: plain buttons, so a click always navigates, also on the page you're already in
+         (e.g. Library while an art piece is open goes back to the Library). -->
+    <Shell.FlyoutContent>
+        <VerticalStackLayout x:Name="Menu" Padding="8,0" Spacing="2" BindableLayout.ItemsSource="{Binding MenuEntries, Source={x:Reference ShellRoot}, x:DataType=local:AppShell}">
+            <BindableLayout.ItemTemplate>
+                <DataTemplate x:DataType="local:MenuEntry">
+                    <Button Text="{Binding Title}" HorizontalOptions="Fill" Padding="12,8" CornerRadius="6"
+                            BackgroundColor="Transparent" BorderWidth="0"
+                            TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                            Command="{Binding NavigateCommand, Source={x:Reference ShellRoot}, x:DataType=local:AppShell}" CommandParameter="{Binding Route}">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding IsCurrent}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource Pond}" />
+                                <Setter Property="TextColor" Value="White" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                </DataTemplate>
+            </BindableLayout.ItemTemplate>
+        </VerticalStackLayout>
+    </Shell.FlyoutContent>
 
     <FlyoutItem Title="Library">
         <ShellContent Route="library" ContentTemplate="{DataTemplate views:LibraryPage}" />
