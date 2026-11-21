@@ -238,6 +238,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         ApplyFilter();
         UpdateSelection();
         OnPropertyChanged(nameof(HasRoot));
+        NameFixCount = PieceService.PlanNameFixes(_app.AllFolders).Count;
     }
 
     private void ApplyFilter()
@@ -257,6 +258,46 @@ public sealed partial class LibraryViewModel : ObservableObject
         RelayoutRaster();
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(NoMatches));
+    }
+
+    // ---- Fix all names ------------------------------------------------------------------------------
+
+    /// <summary>How many file and folder names in the library don't fit the naming rules.</summary>
+    [ObservableProperty] public partial int NameFixCount { get; set; }
+    public bool HasNameFixes => NameFixCount > 0;
+    public string FixNamesText => $"Fix all names ({NameFixCount})";
+
+    partial void OnNameFixCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasNameFixes));
+        OnPropertyChanged(nameof(FixNamesText));
+    }
+
+    [RelayCommand]
+    private void FixAllNames() => Ui.Fire(FixAllNamesAsync);
+
+    private async Task FixAllNamesAsync()
+    {
+        if (!_app.HasRoot) return;
+        var plan = PieceService.PlanNameFixes(_app.AllFolders);
+        if (plan.Count == 0) { await Dialogs.AlertAsync("All names are fine", "Every file and folder already follows the naming rules. Honk!"); return; }
+
+        const int shown = 12;
+        var lines = plan.Take(shown).Select(f => $"{(f.IsFolder ? "Folder" : f.PieceTitle)}: {f.OldName} → {f.NewName}");
+        var more = plan.Count > shown ? $"{Environment.NewLine}…and {plan.Count - shown} more." : "";
+        var folders = plan.Count(f => f.IsFolder);
+        var message = string.Join(Environment.NewLine, lines) + more + Environment.NewLine + Environment.NewLine
+                      + (folders > 0 ? "Renamed folders also get their files renamed. " : "")
+                      + "Product links follow along. Nothing is deleted. Make sure the files aren't open in another app.";
+        if (!await Dialogs.ConfirmAsync($"Fix {plan.Count} name(s)?", message, "Fix all")) return;
+
+        NameFixResult result;
+        using (_app.SuspendWatching())
+            result = await Task.Run(() => _pieces.FixAllNames(_app.Pieces));
+        await _app.RefreshAsync();
+        if (result.Problems.Count > 0)
+            await Dialogs.AlertAsync("Some names couldn't be fixed",
+                $"Fixed {result.Renamed}. These were skipped:{Environment.NewLine}" + string.Join(Environment.NewLine, result.Problems.Take(10)));
     }
 
     // ---- Selection ---------------------------------------------------------------------------------

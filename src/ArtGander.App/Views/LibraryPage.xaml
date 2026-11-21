@@ -34,6 +34,7 @@
             <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
                 <ActivityIndicator IsRunning="{Binding IsScanning}" IsVisible="{Binding IsScanning}" HeightRequest="20" WidthRequest="20" />
                 <Button Text="{Binding IsSelecting, Converter={StaticResource SelectLabel}}" Command="{Binding ToggleSelectingCommand}" IsVisible="{Binding HasRoot}" />
+                <Button Text="{Binding FixNamesText}" Command="{Binding FixAllNamesCommand}" IsVisible="{Binding HasNameFixes}" />
                 <Button Text="Refresh" Command="{Binding RefreshCommand}" />
                 <Button Text="New…" Command="{Binding NewPieceCommand}" />
             </HorizontalStackLayout>

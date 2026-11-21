@@ -18,6 +18,43 @@ public class LibraryTests
     }
 
     [Fact]
+    public void All_incompatible_names_are_fixed_with_one_call()
+    {
+        using var lib = new TempLibrary();
+        // A piece with two files that don't follow the convention.
+        lib.WriteFile("Goose/scan from phone.jpg");
+        lib.WriteFile("Goose/Goose_master.PNG");
+        Service.AdoptFolder(Path.Combine(lib.Root, "Goose"));
+        // A folder whose name breaks the rules (underscore), with a convention-named file and a product link to it.
+        lib.WriteFile("Swan_Lake/whatever.png");
+        var swan = Service.AdoptFolder(Path.Combine(lib.Root, "Swan_Lake"));
+        // A project with a piece inside whose folder name breaks the rules.
+        var book = Service.CreateProject(lib.Root, "Goose Book");
+        lib.WriteFile("Goose Book/Page__1/page.png");
+        Service.AdoptFolder(Path.Combine(book.FolderPath, "Page__1"));
+        var (service, catalog) = WithCatalog(lib);
+        var swanFile = swan.Piece.Files.Single().FileName;
+        catalog.Save(new Product { Name = "Swan print", Files = { new ProductFile { PieceId = swan.Piece.Id, FileName = swanFile } } });
+
+        var scanned = new LibraryScanner(_store).Scan(lib.Root, TestContext.Current.CancellationToken);
+        var all = scanned.SelectMany(p => p.Children.Prepend(p)).ToList();
+        var plan = PieceService.PlanNameFixes(all);
+        Assert.Contains(plan, f => f.IsFolder && f.OldName == "Swan_Lake" && f.NewName == "Swan Lake");
+        Assert.Contains(plan, f => f.IsFolder && f.OldName == "Page__1" && f.NewName == "Page 1");
+        Assert.Contains(plan, f => !f.IsFolder && f.OldName == "scan from phone.jpg" && f.NewName == "Goose-scan-from-phone.jpg");
+
+        var result = service.FixAllNames(scanned);
+
+        Assert.Empty(result.Problems);
+        var after = new LibraryScanner(_store).Scan(lib.Root, TestContext.Current.CancellationToken);
+        Assert.Empty(PieceService.PlanNameFixes(after.SelectMany(p => p.Children.Prepend(p))));
+        Assert.True(Directory.Exists(Path.Combine(lib.Root, "Swan Lake")));
+        Assert.True(Directory.Exists(Path.Combine(lib.Root, "Goose Book", "Page 1")));
+        Assert.True(File.Exists(Path.Combine(lib.Root, "Goose", "Goose-scan-from-phone.jpg")));
+        Assert.StartsWith("Swan_Lake-", Assert.Single(Records.Products.LoadAll(lib.Root)).Files[0].FileName); // product link followed
+    }
+
+    [Fact]
     public void Creates_piece_folder_with_details_file()
     {
         using var lib = new TempLibrary();
