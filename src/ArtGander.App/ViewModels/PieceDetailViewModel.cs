@@ -21,7 +21,6 @@ public sealed partial class PieceDetailViewModel(
     IPlatformServices platform,
     ThumbnailService thumbs) : ObservableObject, IQueryAttributable
 {
-    public static IReadOnlyList<FileKind> FileKinds { get; } = Enum.GetValues<FileKind>();
     public static IReadOnlyList<ProductType> ProductTypes { get; } = Enum.GetValues<ProductType>();
     public static IReadOnlyList<OriginalStatus> OriginalStatuses { get; } = Enum.GetValues<OriginalStatus>();
     public static IReadOnlyList<CopyrightStatus> CopyrightStatuses { get; } = Enum.GetValues<CopyrightStatus>();
@@ -47,6 +46,14 @@ public sealed partial class PieceDetailViewModel(
     public string? ReadOnlyReason => Doc?.ReadOnlyReason;
     public string FolderPath => Doc?.FolderPath ?? "";
     public IReadOnlyList<string> Channels => app.Settings.Channels;
+
+    /// <summary>The library's file kinds (Settings), plus any other kind this piece already uses so it still shows.</summary>
+    public IReadOnlyList<string> FileKinds =>
+        (app.Settings.FileKinds.Count > 0 ? app.Settings.FileKinds : FileKind.Defaults)
+            .Concat(Piece?.Files.Select(f => f.Kind) ?? [])
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     public string Currency => app.Currency;
     public IReadOnlyList<string> KnownCollections => app.AllCollections;
 
@@ -121,6 +128,7 @@ public sealed partial class PieceDetailViewModel(
         OnPropertyChanged(nameof(ReadOnlyReason));
         OnPropertyChanged(nameof(FolderPath));
         OnPropertyChanged(nameof(KnownCollections));
+        OnPropertyChanged(nameof(FileKinds));
         RebuildFiles();
         OnEditTitleChanged(EditTitle);
         if (rebuildLists) { RebuildProducts(); RebuildSales(); }
@@ -142,7 +150,7 @@ public sealed partial class PieceDetailViewModel(
         foreach (var name in folder.UntrackedFiles)
         {
             var version = FileNamer.SuggestVersion(Doc.FolderName, name);
-            Untracked.Add(new UntrackedFileViewModel(name, version, PieceService.GuessKind(version, Path.GetExtension(name))));
+            Untracked.Add(new UntrackedFileViewModel(name, version, PieceService.GuessKind(version, Path.GetExtension(name), app.Settings.FileKinds)));
         }
         _ = LoadThumbnailAsync(folder.PreviewFilePath);
         foreach (var p in Products) p.RebuildLinks(Doc.Piece.Files);
@@ -331,11 +339,10 @@ public sealed partial class PieceDetailViewModel(
     private async Task AddFilesAsync()
     {
         if (Doc is null) return;
-        IEnumerable<FileResult>? picked;
-        try { picked = await FilePicker.Default.PickMultipleAsync(new PickOptions { PickerTitle = "Add files to this art piece" }); }
+        IReadOnlyList<string> picked;
+        try { picked = await platform.PickFilesAsync(Doc.FolderPath); } // opens in this piece's folder
         catch (Exception ex) { await Dialogs.ErrorAsync(ex); return; }
-        if (picked is null) return;
-        await ImportPathsAsync(picked.Select(p => p.FullPath).ToList());
+        await ImportPathsAsync(picked);
     }
 
     public async Task ImportPathsAsync(IReadOnlyList<string> paths)
@@ -344,12 +351,27 @@ public sealed partial class PieceDetailViewModel(
         foreach (var path in paths)
         {
             if (!File.Exists(path)) continue;
+
+            // A file that is already in this piece's folder is tracked (and renamed) in place, never copied.
+            if (NameRules.NamesEqual(Path.GetDirectoryName(Path.GetFullPath(path)), Path.GetFullPath(Doc.FolderPath)))
+            {
+                var name = Path.GetFileName(path);
+                if (Doc.Piece.FindFile(name) is not null) { await Dialogs.AlertAsync("Already added", $"\"{name}\" is already part of this art piece."); continue; }
+                var inPlaceVersion = await Dialogs.PromptAsync("Version name",
+                    $"Version label for \"{name}\".\nIt is renamed to {NameRules.ToFileBaseName(Doc.FolderName)}-<version>{Path.GetExtension(name).ToLowerInvariant()}",
+                    FileNamer.SuggestVersion(Doc.FolderName, name), "Add", "e.g. master, transparent, print-a4");
+                if (string.IsNullOrWhiteSpace(inPlaceVersion)) continue;
+                var inPlaceKind = PieceService.GuessKind(inPlaceVersion, Path.GetExtension(name), app.Settings.FileKinds);
+                await FileOpAsync(() => pieces.TrackFile(Doc, name, inPlaceVersion, inPlaceKind, renameToConvention: true));
+                continue;
+            }
+
             var suggestion = FileNamer.SuggestVersion(Doc.FolderName, Path.GetFileName(path));
             var version = await Dialogs.PromptAsync("Version name",
                 $"Version label for \"{Path.GetFileName(path)}\".\nIt is saved as {NameRules.ToFileBaseName(Doc.FolderName)}-<version>{Path.GetExtension(path).ToLowerInvariant()}",
                 suggestion, "Add", "e.g. master, transparent, print-a4");
             if (string.IsNullOrWhiteSpace(version)) continue;
-            var kind = PieceService.GuessKind(version, Path.GetExtension(path));
+            var kind = PieceService.GuessKind(version, Path.GetExtension(path), app.Settings.FileKinds);
             await FileOpAsync(() => pieces.ImportFile(Doc, path, version, kind));
         }
     }

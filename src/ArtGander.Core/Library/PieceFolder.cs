@@ -81,7 +81,14 @@ public sealed class PieceFolder
     }
 
     private static readonly string[] PreviewExtensions = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic"];
-    private static readonly FileKind[] PreviewPreference = [FileKind.Master, FileKind.Edit, FileKind.Print, FileKind.Transparent, FileKind.Mockup, FileKind.Photo, FileKind.Scan, FileKind.Other];
+    private static readonly string[] PreviewPreference = [FileKind.Master, FileKind.Edit, FileKind.Print, FileKind.Transparent, FileKind.Mockup, FileKind.Photo, FileKind.Scan];
+
+    /// <summary>Known good preview kinds first; custom and "other" kinds after them.</summary>
+    private static int PreviewRank(string kind)
+    {
+        var i = Array.FindIndex(PreviewPreference, k => NameRules.NamesEqual(k, kind));
+        return i < 0 ? PreviewPreference.Length : i;
+    }
 
     /// <summary>Picks the best file to show as the piece's thumbnail.</summary>
     public string? PreviewFilePath
@@ -90,7 +97,7 @@ public sealed class PieceFolder
         {
             var candidates = Document?.Piece.Files
                 .Where(f => PreviewExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant()) && !MissingFiles.Contains(f.FileName))
-                .OrderBy(f => Array.IndexOf(PreviewPreference, f.Kind))
+                .OrderBy(f => PreviewRank(f.Kind))
                 .Select(f => f.FileName)
                 ?? UntrackedFiles.Where(f => PreviewExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
             var first = candidates.FirstOrDefault();

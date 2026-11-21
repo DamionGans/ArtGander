@@ -7,8 +7,23 @@ namespace ArtGander.Core.Model;
 public sealed class CamelCaseEnumConverter<TEnum>() : JsonStringEnumConverter<TEnum>(JsonNamingPolicy.CamelCase, allowIntegerValues: false)
     where TEnum : struct, Enum;
 
-[JsonConverter(typeof(CamelCaseEnumConverter<FileKind>))]
-public enum FileKind { Photo, Scan, Master, Edit, Transparent, Print, Mockup, Other }
+/// <summary>
+/// File version kinds are plain names, so each library can define its own list (Settings → File kinds,
+/// stored in <see cref="LibrarySettings.FileKinds"/>). These are the built-in defaults.
+/// </summary>
+public static class FileKind
+{
+    public const string Photo = "photo";
+    public const string Scan = "scan";
+    public const string Master = "master";
+    public const string Edit = "edit";
+    public const string Transparent = "transparent";
+    public const string Print = "print";
+    public const string Mockup = "mockup";
+    public const string Other = "other";
+
+    public static IReadOnlyList<string> Defaults { get; } = [Photo, Scan, Master, Edit, Transparent, Print, Mockup, Other];
+}
 
 [JsonConverter(typeof(CamelCaseEnumConverter<OriginalStatus>))]
 public enum OriginalStatus { Available, Reserved, Sold, NotForSale, Gifted }

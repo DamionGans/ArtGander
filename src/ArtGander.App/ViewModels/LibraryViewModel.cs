@@ -43,6 +43,141 @@ public sealed partial class LibraryViewModel : ObservableObject
     public bool IsEmpty => _app.HasRoot && !_app.IsScanning && _app.Pieces.Count == 0;
     public bool NoMatches => _app.Pieces.Count > 0 && Items.Count == 0;
 
+    // ---- Selection ---------------------------------------------------------------------------------
+
+    /// <summary>In selection mode, clicking a tile selects it instead of opening it.</summary>
+    [ObservableProperty] public partial bool IsSelecting { get; set; }
+    [ObservableProperty] public partial string SelectionText { get; set; } = "";
+
+    // ---- Tile shape --------------------------------------------------------------------------------
+
+    public static IReadOnlyList<string> TileShapes { get; } = (string[])["Portrait (3:4)", "Square", "Landscape (4:3)"];
+
+    /// <summary>The shape of the library tiles; remembered on this computer.</summary>
+    [ObservableProperty] public partial string TileShape { get; set; } = Preferences.Default.Get("tileShape", TileShapes[0]);
+
+    /// <summary>Tile width, set by the page whenever the window resizes.</summary>
+    [ObservableProperty] public partial double TileWidth { get; set; } = 220;
+
+    public double TileHeight => Math.Round(TileWidth * TileShape switch
+    {
+        "Square" => 1.0,
+        "Landscape (4:3)" => 0.75,
+        _ => 4.0 / 3.0,
+    });
+
+    partial void OnTileWidthChanged(double value) => OnPropertyChanged(nameof(TileHeight));
+
+    partial void OnTileShapeChanged(string value)
+    {
+        Preferences.Default.Set("tileShape", value);
+        OnPropertyChanged(nameof(TileHeight));
+    }
+    [ObservableProperty] public partial int UntrackedSelectedCount { get; set; }
+    [ObservableProperty] public partial int TrackedSelectedCount { get; set; }
+
+    public bool CanTrackSelected => UntrackedSelectedCount > 0;
+    public bool CanAddSelectedToCollection => TrackedSelectedCount > 0;
+    public string TrackSelectedText => $"Start tracking ({UntrackedSelectedCount})";
+    public string AddSelectedText => $"Add to collection… ({TrackedSelectedCount})";
+
+    private IEnumerable<PieceItemViewModel> Selected => _all.Where(i => i.IsSelected);
+
+    partial void OnIsSelectingChanged(bool value)
+    {
+        if (!value) foreach (var i in _all) i.IsSelected = false;
+        foreach (var i in _all) i.IsSelecting = value;
+        UpdateSelection();
+    }
+
+    private void UpdateSelection()
+    {
+        var selected = Selected.ToList();
+        UntrackedSelectedCount = selected.Count(i => !i.Folder.IsAdopted && i.Folder.Error is null);
+        TrackedSelectedCount = selected.Count(i => i.Folder.Document is { IsReadOnly: false });
+        SelectionText = selected.Count == 0 ? "Click art pieces to select them" : $"{selected.Count} selected";
+        OnPropertyChanged(nameof(CanTrackSelected));
+        OnPropertyChanged(nameof(CanAddSelectedToCollection));
+        OnPropertyChanged(nameof(TrackSelectedText));
+        OnPropertyChanged(nameof(AddSelectedText));
+    }
+
+    [RelayCommand]
+    private void ToggleSelecting() => IsSelecting = !IsSelecting;
+
+    [RelayCommand]
+    private void SelectAll()
+    {
+        var allVisibleSelected = Items.All(i => i.IsSelected);
+        foreach (var i in Items) i.IsSelected = !allVisibleSelected;
+        UpdateSelection();
+    }
+
+    [RelayCommand]
+    private void TrackSelected() => Ui.Fire(TrackSelectedAsync);
+
+    private async Task TrackSelectedAsync()
+    {
+        var folders = Selected.Where(i => !i.Folder.IsAdopted && i.Folder.Error is null).Select(i => i.Folder).ToList();
+        if (folders.Count == 0) return;
+        var ok = await Dialogs.ConfirmAsync($"Start tracking {folders.Count} folder{(folders.Count == 1 ? "" : "s")}?",
+            "ArtGander adds a hidden .artgander.json details file to each folder. Your files are not renamed or moved.", "Start tracking");
+        if (!ok) return;
+
+        var failed = new List<string>();
+        using (_app.SuspendWatching())
+        {
+            foreach (var folder in folders)
+            {
+                try { _pieces.AdoptFolder(folder.FolderPath, _app.Settings); }
+                catch (Exception ex) { failed.Add($"{folder.FolderName}: {ex.Message}"); }
+            }
+        }
+        await _app.RefreshAsync();
+        UpdateSelection(); // the same tiles stay selected, now tracked, ready for "Add to collection"
+        if (failed.Count > 0) await Dialogs.AlertAsync("Some folders were not tracked", string.Join(Environment.NewLine, failed));
+    }
+
+    [RelayCommand]
+    private void AddSelectedToCollection() => Ui.Fire(AddSelectedToCollectionAsync);
+
+    private async Task AddSelectedToCollectionAsync()
+    {
+        var pieces = Selected.Where(i => i.Folder.Document is { IsReadOnly: false }).ToList();
+        if (pieces.Count == 0) return;
+
+        const string newCollection = "New collection…";
+        var options = _app.AllCollections.Append(newCollection).ToArray();
+        var choice = await Dialogs.ChooseAsync($"Add {pieces.Count} art piece{(pieces.Count == 1 ? "" : "s")} to collection", options);
+        if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
+        if (choice == newCollection)
+        {
+            choice = await Dialogs.PromptAsync("New collection", "Name of the collection:", accept: "Add");
+            if (string.IsNullOrWhiteSpace(choice)) return;
+            choice = choice.Trim();
+            if (!_app.Settings.Collections.Any(c => NameRules.NamesEqual(c.Name, choice)))
+            {
+                _app.Settings.Collections.Add(new Core.Model.CollectionInfo { Name = choice });
+                _app.SaveSettings();
+            }
+        }
+
+        var failed = new List<string>();
+        var added = 0;
+        using (_app.SuspendWatching())
+        {
+            foreach (var piece in pieces)
+            {
+                try { if (_pieces.AddToCollection(piece.Folder.FolderPath, choice)) added++; }
+                catch (Exception ex) { failed.Add($"{piece.Title}: {ex.Message}"); }
+            }
+        }
+        IsSelecting = false;
+        await _app.RefreshAsync();
+        if (failed.Count > 0) await Dialogs.AlertAsync("Some pieces were not updated", string.Join(Environment.NewLine, failed));
+        else Summary = $"Added {added} art piece{(added == 1 ? "" : "s")} to \"{choice}\" · " + Summary;
+    }
+
     partial void OnSearchTextChanged(string value) => ApplyFilter();
     partial void OnSelectedCollectionChanged(string value) => ApplyFilter();
     partial void OnAttentionOnlyChanged(bool value) => ApplyFilter();
@@ -61,7 +196,8 @@ public sealed partial class LibraryViewModel : ObservableObject
         var previous = _all.ToDictionary(i => i.Folder.FolderPath, StringComparer.Ordinal);
         _all = _app.Pieces.Select(p =>
         {
-            var vm = new PieceItemViewModel(p, _app.Currency);
+            var vm = new PieceItemViewModel(p, _app.Currency) { IsSelecting = IsSelecting };
+            if (previous.TryGetValue(p.FolderPath, out var prev)) vm.IsSelected = prev.IsSelected; // keep selection across refreshes
             if (previous.TryGetValue(p.FolderPath, out var old) && old.PreviewSource == p.PreviewFilePath) vm.Thumbnail = old.Thumbnail;
             else _ = vm.LoadThumbnailAsync(_thumbs);
             return vm;
@@ -76,6 +212,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         var attention = _app.Pieces.Count(p => p.NeedsAttention);
         Summary = $"{_app.Pieces.Count} art piece{(_app.Pieces.Count == 1 ? "" : "s")}" + (attention > 0 ? $" · {attention} need attention" : "");
         ApplyFilter();
+        UpdateSelection();
         OnPropertyChanged(nameof(HasRoot));
     }
 
@@ -127,6 +264,12 @@ public sealed partial class LibraryViewModel : ObservableObject
     private async Task OpenAsync(PieceItemViewModel? item)
     {
         if (item is null) return;
+        if (IsSelecting)
+        {
+            item.IsSelected = !item.IsSelected;
+            UpdateSelection();
+            return;
+        }
         if (!item.Folder.IsAdopted)
         {
             if (item.Folder.Error is { } error)
@@ -164,6 +307,8 @@ public sealed partial class PieceItemViewModel(PieceFolder folder, string curren
     public string? PreviewSource => Folder.PreviewFilePath;
 
     [ObservableProperty] public partial ImageSource? Thumbnail { get; set; }
+    [ObservableProperty] public partial bool IsSelected { get; set; }
+    [ObservableProperty] public partial bool IsSelecting { get; set; }
 
     public bool NeedsAttention => Folder.NeedsAttention;
 

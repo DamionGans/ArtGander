@@ -168,7 +168,7 @@
                                     </VerticalStackLayout>
                                     <VerticalStackLayout Grid.Column="2" VerticalOptions="Center">
                                         <Label Text="Kind" Style="{StaticResource FieldLabel}" Margin="0" />
-                                        <Picker ItemsSource="{x:Static vm:PieceDetailViewModel.FileKinds}" SelectedItem="{Binding Entry.Kind}"
+                                        <Picker ItemsSource="{Binding FileKinds, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" SelectedItem="{Binding Entry.Kind}"
                                                 ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
                                     </VerticalStackLayout>
                                     <HorizontalStackLayout Grid.Column="3" Spacing="6" VerticalOptions="Center">
@@ -190,7 +190,7 @@
                                 <Grid ColumnDefinitions="*,200,160,Auto" ColumnSpacing="10">
                                     <Label Text="{Binding FileName}" VerticalOptions="Center" LineBreakMode="MiddleTruncation" />
                                     <Entry Grid.Column="1" Text="{Binding Version}" Placeholder="version" />
-                                    <Picker Grid.Column="2" ItemsSource="{x:Static vm:PieceDetailViewModel.FileKinds}" SelectedItem="{Binding Kind}"
+                                    <Picker Grid.Column="2" ItemsSource="{Binding FileKinds, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" SelectedItem="{Binding Kind}"
                                             ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
                                     <HorizontalStackLayout Grid.Column="3" Spacing="6">
                                         <Button Text="Track &amp; rename" Command="{Binding TrackFileCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />

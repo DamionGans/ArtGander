@@ -44,15 +44,34 @@ public sealed class PieceService(ArtPieceStore store)
             Copyright = new Copyright { Owner = defaults?.DefaultCopyrightOwner ?? "", Year = Directory.GetCreationTime(folderPath).Year },
         };
         foreach (var file in Library.PieceFolder.ListArtFiles(folderPath))
-            piece.Files.Add(NewEntry(file, FileNamer.SuggestVersion(folderName, file)));
+        {
+            var version = FileNamer.SuggestVersion(folderName, file);
+            piece.Files.Add(NewEntry(file, version, GuessKind(version, Path.GetExtension(file), defaults?.FileKinds)));
+        }
         return store.Create(folderPath, piece);
+    }
+
+    /// <summary>
+    /// Adds a piece to a collection, editing the latest version of its details file on disk.
+    /// </summary>
+    /// <returns>False when the piece was already in the collection.</returns>
+    public bool AddToCollection(string folderPath, string collection)
+    {
+        collection = collection.Trim();
+        if (collection.Length == 0) throw new ArgumentException("The collection name can't be empty.", nameof(collection));
+        var doc = store.Load(folderPath);
+        if (doc.IsReadOnly) throw new InvalidOperationException(doc.ReadOnlyReason ?? "This art piece is read-only.");
+        if (doc.Piece.Collections.Any(c => NameRules.NamesEqual(c, collection))) return false;
+        doc.Piece.Collections.Add(collection);
+        store.Save(doc);
+        return true;
     }
 
     /// <summary>
     /// Copies (or moves) an outside file into the piece folder under the naming convention and tracks it.
     /// </summary>
     /// <returns>The new file entry.</returns>
-    public FileEntry ImportFile(ArtPieceDocument doc, string sourcePath, string version, FileKind kind, bool move = false)
+    public FileEntry ImportFile(ArtPieceDocument doc, string sourcePath, string version, string kind, bool move = false)
     {
         EnsureNotChangedElsewhere(doc);
         var ext = Path.GetExtension(sourcePath);
@@ -79,7 +98,7 @@ public sealed class PieceService(ArtPieceStore store)
     }
 
     /// <summary>Starts tracking a file that already sits in the piece folder. It can optionally be renamed to the convention.</summary>
-    public FileEntry TrackFile(ArtPieceDocument doc, string fileName, string version, FileKind kind, bool renameToConvention)
+    public FileEntry TrackFile(ArtPieceDocument doc, string fileName, string version, string kind, bool renameToConvention)
     {
         var entry = NewEntry(fileName, NameRules.ToVersionLabel(version), kind);
         doc.Piece.Files.Add(entry);
@@ -249,7 +268,7 @@ public sealed class PieceService(ArtPieceStore store)
         }
     }
 
-    private static FileEntry NewEntry(string fileName, string version, FileKind? kind = null) => new()
+    private static FileEntry NewEntry(string fileName, string version, string? kind = null) => new()
     {
         FileName = fileName,
         Version = version,
@@ -257,10 +276,19 @@ public sealed class PieceService(ArtPieceStore store)
         AddedAt = DateTimeOffset.Now,
     };
 
-    /// <summary>Guesses the file kind from the version label and extension, e.g. "transparent" maps to <see cref="FileKind.Transparent"/>.</summary>
-    public static FileKind GuessKind(string version, string extension)
+    /// <summary>
+    /// Guesses the file kind from the version label and extension. The library's own kinds win when the label
+    /// contains one (e.g. kind "sticker sheet" for version "sticker-sheet-a5"); otherwise common words are recognized,
+    /// e.g. "transparent" or "no-bg" map to <see cref="FileKind.Transparent"/>.
+    /// </summary>
+    public static string GuessKind(string version, string extension, IEnumerable<string>? libraryKinds = null)
     {
         var v = version.ToLowerInvariant();
+        var custom = libraryKinds?
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .OrderByDescending(k => k.Length)
+            .FirstOrDefault(k => v.Contains(NameRules.ToVersionLabel(k), StringComparison.Ordinal));
+        if (custom is not null) return custom;
         if (v.Contains("transparent") || v.Contains("transp") || v.Contains("no-bg") || v.Contains("nobg")) return FileKind.Transparent;
         if (v.Contains("photo") || v.Contains("foto") || v.Contains("raw")) return FileKind.Photo;
         if (v.Contains("scan")) return FileKind.Scan;

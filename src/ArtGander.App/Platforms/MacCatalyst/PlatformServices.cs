@@ -28,6 +28,27 @@ public sealed class PlatformServices : IPlatformServices
         return tcs.Task;
     }
 
+    public Task<IReadOnlyList<string>> PickFilesAsync(string startFolder)
+    {
+        var tcs = new TaskCompletionSource<IReadOnlyList<string>>();
+        var picker = new UIDocumentPickerViewController([UTTypes.Item], asCopy: false)
+        {
+            AllowsMultipleSelection = true,
+            DirectoryUrl = new NSUrl(startFolder, true),
+        };
+        picker.DidPickDocumentAtUrls += (_, e) =>
+        {
+            foreach (var url in e.Urls) url.StartAccessingSecurityScopedResource();
+            tcs.TrySetResult(e.Urls.Select(u => u.Path).OfType<string>().ToList());
+        };
+        picker.WasCancelled += (_, _) => tcs.TrySetResult([]);
+
+        var root = Platform.GetCurrentUIViewController();
+        if (root is null) return Task.FromResult<IReadOnlyList<string>>([]);
+        root.PresentViewController(picker, true, null);
+        return tcs.Task;
+    }
+
     public void RevealInFileManager(string path)
     {
         // Mac Catalyst has no direct NSWorkspace API, so open the folder itself (Finder opens it).

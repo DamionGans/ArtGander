@@ -19,6 +19,8 @@
             <conv:MoneyConverter x:Key="Money" />
             <conv:NotNullOrEmptyConverter x:Key="HasValue" />
             <conv:InverseBoolConverter x:Key="Not" />
+            <conv:SelectLabelConverter x:Key="SelectLabel" />
+            <conv:CheckMarkConverter x:Key="CheckMark" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

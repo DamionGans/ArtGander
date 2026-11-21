@@ -29,6 +29,10 @@
                 <Entry Text="{Binding DefaultCopyrightOwner}" Placeholder="Your name or studio name" />
                 <Label Text="Sales channels (comma-separated)" Style="{StaticResource FieldLabel}" />
                 <Entry Text="{Binding Channels}" Placeholder="shopify, printify, inPerson, other" />
+                <Label Text="File version kinds (comma-separated)" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding FileKinds}" Placeholder="photo, scan, master, edit, transparent, print, mockup, other" />
+                <Label Text="Every file of an art piece gets one of these kinds. Add your own, e.g. sticker sheet, social media, thumbnail. A new file gets a kind automatically when its version name contains it."
+                       Style="{StaticResource Muted}" />
                 <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" Margin="0,12,0,0" />
                 <Label Text="{Binding Status}" Style="{StaticResource Muted}" IsVisible="{Binding Status, Converter={StaticResource HasValue}}" />
             </VerticalStackLayout>

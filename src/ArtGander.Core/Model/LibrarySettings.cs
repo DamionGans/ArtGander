@@ -14,6 +14,9 @@ public sealed partial class LibrarySettings : ModelBase
     [ObservableProperty] public partial string DefaultCopyrightOwner { get; set; } = "";
     public ObservableCollection<CollectionInfo> Collections { get; set; } = [];
     public ObservableCollection<string> Channels { get; set; } = ["shopify", "printify", "inPerson", "other"];
+
+    /// <summary>The kinds a file version can have, e.g. photo, master, transparent. Editable in Settings.</summary>
+    public ObservableCollection<string> FileKinds { get; set; } = [.. FileKind.Defaults];
 }
 
 public sealed partial class CollectionInfo : ModelBase

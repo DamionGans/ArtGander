@@ -20,6 +20,21 @@ public sealed class PlatformServices : IPlatformServices
         return folder?.Path;
     }
 
+    public async Task<IReadOnlyList<string>> PickFilesAsync(string startFolder)
+    {
+        var window = Application.Current?.Windows.FirstOrDefault()?.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+        if (window is null) return [];
+        var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(window.AppWindow.Id)
+        {
+            // Always open in the art piece's folder (not wherever the last pick happened).
+            SuggestedFolder = startFolder,
+            CommitButtonText = "Add to art piece",
+        };
+        picker.FileTypeFilter.Add("*");
+        var files = await picker.PickMultipleFilesAsync();
+        return files?.Select(f => f.Path).Where(p => !string.IsNullOrEmpty(p)).ToList() ?? [];
+    }
+
     public void RevealInFileManager(string path)
     {
         var args = File.Exists(path) ? $"/select,\"{path}\"" : $"\"{path}\"";

@@ -23,6 +23,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string DefaultCurrency { get; set; } = "EUR";
     [ObservableProperty] public partial string DefaultCopyrightOwner { get; set; } = "";
     [ObservableProperty] public partial string Channels { get; set; } = "";
+    [ObservableProperty] public partial string FileKinds { get; set; } = "";
     [ObservableProperty] public partial string? Status { get; set; }
 
     public bool HasRoot => _app.HasRoot;
@@ -35,6 +36,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         DefaultCurrency = _app.Settings.DefaultCurrency;
         DefaultCopyrightOwner = _app.Settings.DefaultCopyrightOwner;
         Channels = string.Join(", ", _app.Settings.Channels);
+        FileKinds = string.Join(", ", _app.Settings.FileKinds);
         OnPropertyChanged(nameof(HasRoot));
     }
 
@@ -64,6 +66,11 @@ public sealed partial class SettingsViewModel : ObservableObject
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         s.Channels.Clear();
         foreach (var c in channels) s.Channels.Add(c);
+        var kinds = FileKinds.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (kinds.Count == 0) kinds = [.. Core.Model.FileKind.Defaults];
+        s.FileKinds.Clear();
+        foreach (var k in kinds) s.FileKinds.Add(k);
         try
         {
             _app.SaveSettings();

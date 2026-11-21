@@ -71,7 +71,7 @@ UTF-8 without BOM, LF line endings, 2-space indentation, camelCase property name
   },
   "files": [
     { "fileName": "Goose_On_The_Loose-transparent.png", "version": "transparent",
-      "kind": "transparent",             // photo | scan | master | edit | transparent | print | mockup | other
+      "kind": "transparent",             // one of the library's file kinds (Settings); defaults: photo, scan, master, edit, transparent, print, mockup, other
       "notes": "", "addedAt": "…" }
   ],
   "products": [

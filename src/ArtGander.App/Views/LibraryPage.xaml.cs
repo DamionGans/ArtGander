@@ -8,10 +8,12 @@ public partial class LibraryPage : ContentPage
     private readonly AppState _app;
     private bool _initialized;
 
+    private readonly LibraryViewModel _vm;
+
     public LibraryPage(LibraryViewModel viewModel, AppState app)
     {
         InitializeComponent();
-        BindingContext = viewModel;
+        BindingContext = _vm = viewModel;
         _app = app;
         SizeChanged += (_, _) => UpdateSpan();
     }
@@ -33,7 +35,10 @@ public partial class LibraryPage : ContentPage
     private void UpdateSpan()
     {
         if (Width <= 0) return;
-        var span = Math.Max(2, (int)((Width - 48) / TileWidth));
+        const double spacing = 14, padding = 48, scrollbar = 16;
+        var available = Width - padding - scrollbar;
+        var span = Math.Max(2, (int)((available + spacing) / (TileWidth + spacing)));
+        _vm.TileWidth = Math.Floor((available - spacing * (span - 1)) / span); // height follows the chosen shape
         if (Grid.ItemsLayout is GridItemsLayout { Span: var current } && current == span) return;
         Grid.ItemsLayout = new GridItemsLayout(span, ItemsLayoutOrientation.Vertical)
         {

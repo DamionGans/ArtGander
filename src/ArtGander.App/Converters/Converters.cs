@@ -125,3 +125,17 @@ public sealed class InverseBoolConverter : IValueConverter
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not true;
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not true;
 }
+
+/// <summary>"Select" or "Done" for the library's selection-mode button.</summary>
+public sealed class SelectLabelConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is true ? "Done" : "Select";
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
+/// <summary>A checked or unchecked box character for selection overlays.</summary>
+public sealed class CheckMarkConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is true ? "☑" : "☐";
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
+}

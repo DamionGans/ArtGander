@@ -6,6 +6,9 @@ public interface IPlatformServices
     /// <summary>Shows the native folder picker. Returns null when cancelled.</summary>
     Task<string?> PickFolderAsync();
 
+    /// <summary>Shows the native multi-file picker, opened in <paramref name="startFolder"/>. Returns the chosen paths (empty when cancelled).</summary>
+    Task<IReadOnlyList<string>> PickFilesAsync(string startFolder);
+
     /// <summary>Shows a file or folder in Explorer or Finder.</summary>
     void RevealInFileManager(string path);
 

@@ -96,6 +96,42 @@ public class LibraryTests
     }
 
     [Fact]
+    public void Library_file_kinds_are_recognized_from_version_names()
+    {
+        string[] kinds = [.. FileKind.Defaults, "sticker sheet", "social media"];
+
+        Assert.Equal("sticker sheet", PieceService.GuessKind("sticker-sheet-a5", ".png", kinds));
+        Assert.Equal("social media", PieceService.GuessKind("social-media-square", ".jpg", kinds));
+        Assert.Equal(FileKind.Transparent, PieceService.GuessKind("no-bg", ".png", kinds));
+        Assert.Equal(FileKind.Other, PieceService.GuessKind("something", ".png", kinds));
+    }
+
+    [Fact]
+    public void Old_library_settings_get_default_file_kinds()
+    {
+        using var lib = new TempLibrary();
+        lib.WriteFile(".artgander/library.json", """{ "schemaVersion": 1, "defaultCurrency": "USD" }""");
+        var settings = LibrarySettingsStore.Load(lib.Root);
+        Assert.Equal(FileKind.Defaults, settings.FileKinds);
+
+        settings.FileKinds.Add("sticker sheet");
+        LibrarySettingsStore.Save(lib.Root, settings);
+        Assert.Contains("sticker sheet", LibrarySettingsStore.Load(lib.Root).FileKinds);
+    }
+
+    [Fact]
+    public void Adds_pieces_to_a_collection_once()
+    {
+        using var lib = new TempLibrary();
+        var doc = Service.CreatePiece(lib.Root, "Goose");
+
+        Assert.True(Service.AddToCollection(doc.FolderPath, " Birds "));
+        Assert.False(Service.AddToCollection(doc.FolderPath, "birds"));
+
+        Assert.Equal(["Birds"], _store.Load(doc.FolderPath).Piece.Collections);
+    }
+
+    [Fact]
     public void Copies_with_numbered_suffix_get_unique_convention_names()
     {
         using var lib = new TempLibrary();

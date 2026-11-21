@@ -50,11 +50,11 @@ public sealed partial class FileRowViewModel(FileEntry entry, string fullPath, b
 }
 
 /// <summary>A file on disk that isn't tracked yet.</summary>
-public sealed partial class UntrackedFileViewModel(string fileName, string suggestedVersion, FileKind kind) : ObservableObject
+public sealed partial class UntrackedFileViewModel(string fileName, string suggestedVersion, string kind) : ObservableObject
 {
     public string FileName { get; } = fileName;
     [ObservableProperty] public partial string Version { get; set; } = suggestedVersion;
-    [ObservableProperty] public partial FileKind Kind { get; set; } = kind;
+    [ObservableProperty] public partial string Kind { get; set; } = kind;
 }
 
 /// <summary>A checkbox that links a product to a file.</summary>

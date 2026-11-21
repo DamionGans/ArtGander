@@ -66,7 +66,8 @@ public sealed partial class FileEntry : ModelBase
 {
     [ObservableProperty] public partial string FileName { get; set; } = "";
     [ObservableProperty] public partial string Version { get; set; } = "";
-    [ObservableProperty] public partial FileKind Kind { get; set; } = FileKind.Other;
+    /// <summary>What kind of version this is, e.g. "transparent". One of the library's file kinds (Settings).</summary>
+    [ObservableProperty] public partial string Kind { get; set; } = FileKind.Other;
     [ObservableProperty] public partial string Notes { get; set; } = "";
     public DateTimeOffset? AddedAt { get; set; }
 }
