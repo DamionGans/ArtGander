@@ -133,20 +133,39 @@
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="vm:OrderLineRow">
                         <Border Style="{StaticResource Card}" Padding="10,6">
-                            <Grid ColumnDefinitions="*,70,100,100,150,90,Auto,Auto" ColumnSpacing="10">
+                            <Grid ColumnDefinitions="*,80,100,120,90,150,90,Auto,Auto" ColumnSpacing="10">
                                 <VerticalStackLayout VerticalOptions="Center">
                                     <Label Text="{Binding Title}" FontAttributes="Bold" />
                                     <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" />
                                 </VerticalStackLayout>
-                                <Entry Grid.Column="1" Text="{Binding Line.Quantity, Converter={StaticResource Int}}" Keyboard="Numeric" VerticalOptions="Center" />
-                                <Entry Grid.Column="2" Text="{Binding Line.UnitPrice, Converter={StaticResource Decimal}}" Keyboard="Numeric" VerticalOptions="Center" />
-                                <Entry Grid.Column="3" Text="{Binding Line.UnitCost, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" Placeholder="cost: product" VerticalOptions="Center" />
-                                <Picker Grid.Column="4" ItemsSource="{x:Static vm:OrderDetailViewModel.Fulfillments}" SelectedItem="{Binding Line.Fulfillment}" VerticalOptions="Center"
-                                        ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
-                                <Label Grid.Column="5" Text="{Binding Total, StringFormat='{0:N2}'}" HorizontalTextAlignment="End" VerticalOptions="Center" />
-                                <Button Grid.Column="6" Text="Product" IsVisible="{Binding HasProduct}"
+                                <VerticalStackLayout Grid.Column="1">
+                                    <Label Text="Quantity" Style="{StaticResource FieldLabel}" />
+                                    <Entry Text="{Binding Line.Quantity, Converter={StaticResource Int}}" Keyboard="Numeric" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="2">
+                                    <Label Text="Price each" Style="{StaticResource FieldLabel}" />
+                                    <Entry Text="{Binding Line.UnitPrice, Converter={StaticResource Decimal}}" Keyboard="Numeric" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="3">
+                                    <Label Text="Cost each" Style="{StaticResource FieldLabel}" ToolTipProperties.Text="Leave empty to use the product's production cost" />
+                                    <Entry Text="{Binding Line.UnitCost, Converter={StaticResource NullableDecimal}}" Keyboard="Numeric" Placeholder="from product" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="4">
+                                    <Label Text="Fees" Style="{StaticResource FieldLabel}" ToolTipProperties.Text="e.g. payment or marketplace fees for this item" />
+                                    <Entry Text="{Binding Line.Fees, Converter={StaticResource Decimal}}" Keyboard="Numeric" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="5">
+                                    <Label Text="Shipped by" Style="{StaticResource FieldLabel}" />
+                                    <Picker ItemsSource="{x:Static vm:OrderDetailViewModel.Fulfillments}" SelectedItem="{Binding Line.Fulfillment}"
+                                            ItemDisplayBinding="{Binding ., Converter={StaticResource FulfillmentName}, x:DataType=x:Object}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="6">
+                                    <Label Text="Total" Style="{StaticResource FieldLabel}" HorizontalTextAlignment="End" />
+                                    <Label Text="{Binding Total, StringFormat='{0:N2}'}" HorizontalTextAlignment="End" Margin="0,10,0,0" FontAttributes="Bold" />
+                                </VerticalStackLayout>
+                                <Button Grid.Column="7" Text="Product" IsVisible="{Binding HasProduct}" VerticalOptions="End"
                                         Command="{Binding OpenProductCommand, Source={RelativeSource AncestorType={x:Type vm:OrderDetailViewModel}}, x:DataType=vm:OrderDetailViewModel}" CommandParameter="{Binding .}" />
-                                <Button Grid.Column="7" Text="Remove"
+                                <Button Grid.Column="8" Text="Remove" VerticalOptions="End"
                                         Command="{Binding RemoveItemCommand, Source={RelativeSource AncestorType={x:Type vm:OrderDetailViewModel}}, x:DataType=vm:OrderDetailViewModel}" CommandParameter="{Binding .}" />
                             </Grid>
                         </Border>

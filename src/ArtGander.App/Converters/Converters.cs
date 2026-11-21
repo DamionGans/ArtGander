@@ -156,3 +156,16 @@ public sealed class KeepValueConverter : IValueConverter
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value;
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => value ?? Binding.DoNothing;
 }
+
+/// <summary>Who ships an order item, in plain words.</summary>
+public sealed class FulfillmentNameConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
+    {
+        ArtGander.Core.Model.Fulfillment.Printify => "Printify",
+        ArtGander.Core.Model.Fulfillment.Self => "You (self-shipped)",
+        ArtGander.Core.Model.Fulfillment.Digital => "Digital download",
+        _ => value?.ToString(),
+    };
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
+}

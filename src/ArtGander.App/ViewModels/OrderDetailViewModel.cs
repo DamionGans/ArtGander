@@ -18,10 +18,8 @@ public sealed partial class OrderLineRow : ObservableObject
         Line = line;
         Product = product;
         PieceTitle = pieceTitle;
-        line.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName is nameof(OrderLine.Quantity) or nameof(OrderLine.UnitPrice)) OnPropertyChanged(nameof(Total));
-        };
+        // Any change (quantity, price, cost, fees…) refreshes the total and the order's summary.
+        line.PropertyChanged += (_, _) => OnPropertyChanged(nameof(Total));
     }
 
     public OrderLine Line { get; }

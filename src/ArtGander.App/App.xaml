@@ -23,6 +23,7 @@
             <conv:CheckMarkConverter x:Key="CheckMark" />
             <conv:SortArrowConverter x:Key="SortArrow" />
             <conv:KeepValueConverter x:Key="KeepValue" />
+            <conv:FulfillmentNameConverter x:Key="FulfillmentName" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
