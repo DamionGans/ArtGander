@@ -17,6 +17,25 @@ public sealed partial class LibrarySettings : ModelBase
 
     /// <summary>The kinds a file version can have, e.g. photo, master, transparent. Editable in Settings.</summary>
     public ObservableCollection<string> FileKinds { get; set; } = [.. FileKind.Defaults];
+
+    /// <summary>
+    /// Which Printify shop and Shopify store this library is connected to. Only ids live here (shared by all computers);
+    /// the secret keys are stored per computer in the operating system's keychain.
+    /// </summary>
+    public IntegrationSettings Integrations { get; set; } = new();
+}
+
+public sealed partial class IntegrationSettings : ModelBase
+{
+    [ObservableProperty] public partial long? PrintifyShopId { get; set; }
+    [ObservableProperty] public partial string PrintifyShopTitle { get; set; } = "";
+    /// <summary>e.g. "my-goose-shop.myshopify.com".</summary>
+    [ObservableProperty] public partial string ShopifyDomain { get; set; } = "";
+    /// <summary>The Client ID of the ArtGander app in the Shopify Dev Dashboard (not secret; the client secret is).</summary>
+    [ObservableProperty] public partial string ShopifyClientId { get; set; } = "";
+    [ObservableProperty] public partial string ShopifyApiVersion { get; set; } = "";
+    /// <summary>Default prices of new Printify products: production cost × this factor, when no price is set.</summary>
+    [ObservableProperty] public partial decimal? DefaultMarkup { get; set; }
 }
 
 public sealed partial class CollectionInfo : ModelBase

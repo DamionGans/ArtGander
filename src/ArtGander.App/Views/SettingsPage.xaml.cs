@@ -4,9 +4,17 @@ namespace ArtGander.App.Views;
 
 public partial class SettingsPage : ContentPage
 {
+    private readonly SettingsViewModel _vm;
+
     public SettingsPage(SettingsViewModel viewModel)
     {
         InitializeComponent();
-        BindingContext = viewModel;
+        BindingContext = _vm = viewModel;
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await _vm.Shops.LoadAsync();
     }
 }

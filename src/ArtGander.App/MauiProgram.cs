@@ -19,6 +19,10 @@ public static class MauiProgram
         // Core: platform-neutral services.
         builder.Services.AddSingleton<ArtPieceStore>();
         builder.Services.AddSingleton<ProductCatalog>();
+        builder.Services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(100) });
+        builder.Services.AddSingleton<ArtGander.Core.Integrations.ISecretStore, SecretStore>();
+        builder.Services.AddSingleton<ArtGander.Core.Integrations.Connections>();
+        builder.Services.AddSingleton<ArtGander.Core.Integrations.ImportService>();
         builder.Services.AddSingleton<LibraryScanner>();
         builder.Services.AddSingleton<PieceService>();
 
@@ -43,6 +47,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<OrdersPage>();
         builder.Services.AddSingleton<CollectionsViewModel>();
         builder.Services.AddSingleton<CollectionsPage>();
+        builder.Services.AddSingleton<ShopSettingsViewModel>();
+        builder.Services.AddSingleton<ShopsViewModel>();
+        builder.Services.AddSingleton<ShopsPage>();
         builder.Services.AddSingleton<SettingsViewModel>();
         builder.Services.AddSingleton<SettingsPage>();
 

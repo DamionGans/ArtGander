@@ -23,6 +23,9 @@
     <FlyoutItem Title="Orders">
         <ShellContent Route="orders" ContentTemplate="{DataTemplate views:OrdersPage}" />
     </FlyoutItem>
+    <FlyoutItem Title="Shops">
+        <ShellContent Route="shops" ContentTemplate="{DataTemplate views:ShopsPage}" />
+    </FlyoutItem>
     <FlyoutItem Title="Collections">
         <ShellContent Route="collections" ContentTemplate="{DataTemplate views:CollectionsPage}" />
     </FlyoutItem>

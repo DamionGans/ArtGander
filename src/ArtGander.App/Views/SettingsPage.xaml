@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             xmlns:ci="clr-namespace:ArtGander.Core.Integrations;assembly=ArtGander.Core"
              x:Class="ArtGander.App.Views.SettingsPage"
              Shell.NavBarIsVisible="False"
              x:DataType="vm:SettingsViewModel"
@@ -35,6 +36,50 @@
                        Style="{StaticResource Muted}" />
                 <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" Margin="0,12,0,0" />
                 <Label Text="{Binding Status}" Style="{StaticResource Muted}" IsVisible="{Binding Status, Converter={StaticResource HasValue}}" />
+            </VerticalStackLayout>
+
+            <!-- Shops: Printify and Shopify -->
+            <VerticalStackLayout IsVisible="{Binding HasRoot}" BindingContext="{Binding Shops}" x:DataType="vm:ShopSettingsViewModel" Spacing="4">
+                <Label Text="Shops" Style="{StaticResource SectionTitle}" />
+                <Label Text="Connect Printify and Shopify to import your products and orders and keep listings up to date from ArtGander. The keys you type here stay in this computer's keychain; enter them once on each computer."
+                       Style="{StaticResource Muted}" />
+                <Button Text="How to get the keys (setup guide)" Command="{Binding OpenGuideCommand}" HorizontalOptions="Start" />
+
+                <Label Text="Printify" FontAttributes="Bold" Margin="0,10,0,0" />
+                <Label Text="Personal access token (Printify → My profile → Connections)" Style="{StaticResource FieldLabel}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Entry Text="{Binding PrintifyToken}" IsPassword="True" Placeholder="Paste the token (leave empty to keep the saved one)" />
+                    <Button Grid.Column="1" Text="Connect" Command="{Binding ConnectPrintifyCommand}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasShops}">
+                    <Picker ItemsSource="{Binding PrintifyShops}" SelectedItem="{Binding SelectedPrintifyShop}" ItemDisplayBinding="{Binding Title, x:DataType=ci:PrintifyShop}" />
+                    <Button Grid.Column="1" Text="Use this shop" Command="{Binding UsePrintifyShopCommand}" />
+                </Grid>
+                <Label Text="{Binding PrintifyStatus}" Style="{StaticResource Muted}" />
+
+                <Label Text="Shopify" FontAttributes="Bold" Margin="0,10,0,0" />
+                <Label Text="Store address" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding ShopifyDomain}" Placeholder="your-store.myshopify.com" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <VerticalStackLayout>
+                        <Label Text="Client ID (Dev Dashboard app)" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding ShopifyClientId}" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1">
+                        <Label Text="Client secret" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding ShopifyClientSecret}" IsPassword="True" Placeholder="leave empty to keep the saved one" />
+                    </VerticalStackLayout>
+                </Grid>
+                <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout>
+                        <Label Text="API version (optional)" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding ShopifyApiVersion}" Placeholder="{Binding DefaultApiVersion}" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="2" Text="Save and test" Command="{Binding ConnectShopifyCommand}" VerticalOptions="End" />
+                </Grid>
+                <Label Text="{Binding ShopifyStatus}" Style="{StaticResource Muted}" />
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Start" />
+                <Button Text="Forget the keys on this computer" Command="{Binding ForgetKeysCommand}" HorizontalOptions="Start" Margin="0,8,0,0" />
             </VerticalStackLayout>
 
             <Label Text="About" Style="{StaticResource SectionTitle}" />

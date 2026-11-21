@@ -11,10 +11,11 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly AppState _app;
     private readonly IPlatformServices _platform;
 
-    public SettingsViewModel(AppState app, IPlatformServices platform)
+    public SettingsViewModel(AppState app, IPlatformServices platform, ShopSettingsViewModel shops)
     {
         _app = app;
         _platform = platform;
+        Shops = shops;
         _app.LibraryChanged += (_, _) => Load();
         Load();
     }
@@ -27,6 +28,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string? Status { get; set; }
 
     public bool HasRoot => _app.HasRoot;
+
+    /// <summary>The Printify and Shopify connection.</summary>
+    public ShopSettingsViewModel Shops { get; }
     public string Version => $"ArtGander {ArtPieceStore.AppVersion}";
     public string FormatVersion => $"Details file format version {CurrentSchema.Version}";
 

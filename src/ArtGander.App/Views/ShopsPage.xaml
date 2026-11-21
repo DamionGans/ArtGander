@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             xmlns:st="clr-namespace:ArtGander.Core.Storage;assembly=ArtGander.Core"
+             x:Class="ArtGander.App.Views.ShopsPage"
+             Shell.NavBarIsVisible="False"
+             x:DataType="vm:ShopsViewModel"
+             Title="Shops">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24,16" Spacing="8" MaximumWidthRequest="1000" HorizontalOptions="Start">
+            <Label Text="Shops" Style="{StaticResource PageTitle}" />
+            <Label Text="Bring your Printify and Shopify products and orders into ArtGander. Reading never changes anything in the shops; you see a preview and choose what to import."
+                   Style="{StaticResource Muted}" />
+            <Label Text="{Binding ConnectionText}" />
+
+            <Border Style="{StaticResource Banner}" IsVisible="{Binding Status, Converter={StaticResource HasValue}}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="18" WidthRequest="18" />
+                    <Label Grid.Column="1" Text="{Binding Status}" />
+                </Grid>
+            </Border>
+
+            <!-- ============ ORDERS ============ -->
+            <Label Text="Orders" Style="{StaticResource SectionTitle}" />
+            <Label Text="Shopify orders and the Printify orders that fulfill them become one order: what the customer paid from Shopify, the production bill, shipping and tracking from Printify. Fields you changed yourself are kept."
+                   Style="{StaticResource Muted}" />
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="Check new and changed orders" Command="{Binding FetchOrdersCommand}" CommandParameter="new" />
+                <Button Text="Check all orders" Command="{Binding FetchOrdersCommand}" CommandParameter="all" />
+                <Button Text="Import selected orders" Command="{Binding ImportOrdersCommand}" IsVisible="{Binding HasOrderRows}" Style="{StaticResource TabButtonSelected}" />
+            </HorizontalStackLayout>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding OrderRows}" Spacing="6">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="vm:OrderImportRow">
+                        <Border Style="{StaticResource Card}" Padding="10,6">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                <CheckBox IsChecked="{Binding Include}" VerticalOptions="Start" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                    <Label Text="{Binding Title}" FontAttributes="Bold" />
+                                    <Label Text="{Binding Details}" Style="{StaticResource Muted}" />
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Conflicts}" IsVisible="{Binding HasConflicts}">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ConflictChoice">
+                                                <HorizontalStackLayout Spacing="4">
+                                                    <CheckBox IsChecked="{Binding TakeShop}" VerticalOptions="Center" />
+                                                    <Label Text="{Binding Text, StringFormat='Use the shop value · {0}'}" Style="{StaticResource WarningText}" VerticalOptions="Center" />
+                                                </HorizontalStackLayout>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <!-- ============ PRODUCTS ============ -->
+            <Label Text="Products" Style="{StaticResource SectionTitle}" />
+            <Label Text="Printify products published to Shopify become one ArtGander product with both links. Pick the art piece each one shows (suggested from the title). Products already in ArtGander keep their ArtGander texts and prices."
+                   Style="{StaticResource Muted}" />
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="Find products in the shops" Command="{Binding FetchProductsCommand}" />
+                <Button Text="Select all / none" Command="{Binding SelectAllProductsCommand}" IsVisible="{Binding HasProductRows}" />
+                <Button Text="Import selected products" Command="{Binding ImportProductsCommand}" IsVisible="{Binding HasProductRows}" Style="{StaticResource TabButtonSelected}" />
+            </HorizontalStackLayout>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding ProductRows}" Spacing="6">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ProductImportRow">
+                        <Border Style="{StaticResource Card}" Padding="10,6">
+                            <Grid ColumnDefinitions="Auto,*,300" ColumnSpacing="10">
+                                <CheckBox IsChecked="{Binding Include}" VerticalOptions="Center" />
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                    <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Details}" Style="{StaticResource Muted}" />
+                                </VerticalStackLayout>
+                                <Picker Grid.Column="2" Title="Art piece…" ItemsSource="{Binding Pieces}" SelectedItem="{Binding Piece}"
+                                        ItemDisplayBinding="{Binding DisplayTitle, x:DataType=st:ArtPieceDocument}" VerticalOptions="Center" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
