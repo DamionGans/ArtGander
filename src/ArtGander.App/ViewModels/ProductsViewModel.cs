@@ -45,7 +45,7 @@ public sealed partial class ProductsViewModel : ObservableObject
     {
         _app = app;
         _thumbs = thumbs;
-        _app.LibraryChanged += (_, _) => Rebuild();
+        _app.LibraryChanged += (_, _) => { Rebuild(); UpdateTidy(); };
     }
 
     public ObservableCollection<ProductTile> Products { get; } = [];
@@ -87,6 +87,50 @@ public sealed partial class ProductsViewModel : ObservableObject
         SummaryText = total == 0
             ? "No products yet. Create one here or from an art piece's Products tab."
             : Products.Count == total ? $"{total} product{(total == 1 ? "" : "s")}" : $"{Products.Count} of {total} products";
+    }
+
+    /// <summary>Checks the product folders' places (touches the disk, so only after a rescan, not on every filter change).</summary>
+    private void UpdateTidy()
+    {
+        try { TidyCount = _app.HasRoot ? _app.Catalog.PlanTidy().Count : 0; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { TidyCount = 0; }
+    }
+
+    /// <summary>Products whose folder isn't where it belongs (grouped under its one art piece, or directly in the products folder).</summary>
+    [ObservableProperty] public partial int TidyCount { get; set; }
+    public bool HasTidy => TidyCount > 0;
+    public string TidyText => TidyCount == 1 ? "1 product folder isn't in its place." : $"{TidyCount} product folders aren't in their place.";
+    partial void OnTidyCountChanged(int value) { OnPropertyChanged(nameof(HasTidy)); OnPropertyChanged(nameof(TidyText)); }
+
+    /// <summary>When the art pieces a product shows changed, its folder belongs elsewhere: asks, then moves it.</summary>
+    public static async Task OfferMoveAsync(AppState app, Product saved)
+    {
+        string? to;
+        try { to = app.Catalog.PendingMove(saved); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
+        if (to is null) return;
+        var from = ProductCatalog.FolderOf(saved) is { } f && app.RootPath is { } root ? Path.GetRelativePath(root, f) : "";
+        var why = saved.Pieces.Count == 1
+            ? "now shows one art piece, so its folder goes with that piece's other products"
+            : "no longer shows exactly one art piece, so its folder goes directly in the products folder";
+        if (!await Dialogs.ConfirmAsync("Move the product folder?", $"\"{saved.Name}\" {why}.\n\nMove its folder (with its pictures)\nfrom {from}\nto {to}?", "Move")) return;
+        try { using (app.SuspendWatching()) app.Catalog.MoveToPlace(saved); }
+        catch (Exception ex) { await Dialogs.ErrorAsync(ex); }
+    }
+
+    [RelayCommand]
+    private void TidyUp() => Ui.Fire(TidyUpAsync);
+
+    private async Task TidyUpAsync()
+    {
+        var moves = _app.Catalog.PlanTidy();
+        if (moves.Count == 0) return;
+        var list = string.Join("\n", moves.Take(15).Select(m => $"• {m.Product.Name}: {m.From} → {m.To}")) + (moves.Count > 15 ? $"\n… and {moves.Count - 15} more" : "");
+        if (!await Dialogs.ConfirmAsync("Tidy up product folders?", "Products of one art piece are grouped in a folder named after it; the others sit directly in the products folder. These folders (with their pictures) will move:\n\n" + list, "Move")) return;
+        IReadOnlyList<string> problems;
+        using (_app.SuspendWatching()) problems = _app.Catalog.Tidy();
+        if (problems.Count > 0) await Dialogs.AlertAsync("Not everything could be moved", string.Join("\n", problems));
+        await _app.RefreshAsync();
     }
 
     /// <summary>The first linked file, or else the first linked piece's preview.</summary>

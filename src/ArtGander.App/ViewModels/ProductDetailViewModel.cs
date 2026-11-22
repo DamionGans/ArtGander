@@ -81,7 +81,7 @@ public sealed partial class BundleRow : ObservableObject
 /// The editor for one product. Edits are made on a copy and written on Save; a product changed on another computer
 /// (or by a sync) in the meantime is never overwritten without asking.
 /// </summary>
-public sealed partial class ProductDetailViewModel(AppState app, ThumbnailService thumbs, Core.Integrations.ProductCreator creator) : ObservableObject, IQueryAttributable
+public sealed partial class ProductDetailViewModel(AppState app, ThumbnailService thumbs, Core.Integrations.ProductCreator creator, IPlatformServices platform) : ObservableObject, IQueryAttributable
 {
     public static IReadOnlyList<ProductType> ProductTypes { get; } = Enum.GetValues<ProductType>();
     public static IReadOnlyList<ProductStatus> ProductStatuses { get; } = Enum.GetValues<ProductStatus>();
@@ -105,7 +105,7 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
 
     public IReadOnlyList<string> Channels => app.Settings.Channels;
     public string Currency => app.Currency;
-    public bool IsReadOnly => Records.Products.IsReadOnly(Product);
+    public bool IsReadOnly => ProductStore.IsReadOnly(Product);
 
     public bool IsOverview => Tab == "overview";
     public bool IsArt => Tab == "art";
@@ -199,6 +199,7 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
         RebuildBundle();
         RebuildSales();
         OnPropertyChanged(nameof(PrintifyText));
+        OnPropertyChanged(nameof(FolderText));
         OnPropertyChanged(nameof(ShopifyText));
         OnPropertyChanged(nameof(ShopifyUrl));
         OnPropertyChanged(nameof(HasShopifyUrl));
@@ -438,6 +439,7 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
         {
             using (app.SuspendWatching()) app.Catalog.Save(Product, force);
             var saved = Product;
+            await ProductsViewModel.OfferMoveAsync(app, saved);
             Product = Copy(saved); // keep editing a copy; the catalog holds the saved one
             _savedJson = ArtGanderJson.Serialize(Product);
             _savedTags = TagsText = string.Join(", ", Product.Tags);
@@ -463,13 +465,21 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
         }
     }
 
+    public string FolderText => ProductCatalog.FolderOf(Product) is { } f && app.RootPath is { } root ? Path.GetRelativePath(root, f) : "Saved in its own folder in the products folder once you save it.";
+
+    [RelayCommand]
+    private void ShowFolder()
+    {
+        if (ProductCatalog.FolderOf(Product) is { } f && Directory.Exists(f)) platform.RevealInFileManager(f);
+    }
+
     [RelayCommand]
     private async Task DeleteAsync()
     {
         if (IsNew || !app.HasRoot) { IsLeaveConfirmed = true; await Shell.Current.GoToAsync(".."); return; }
         var online = Product.IsOnPrintify || Product.IsOnShopify
             ? " It is only removed from ArtGander, not from Printify or Shopify." : "";
-        var msg = (Sales.Count > 0 ? $"{Sales.Count} sold item(s) refer to it. They are kept, but lose their product link." : "The product is deleted.") + online;
+        var msg = (Sales.Count > 0 ? $"{Sales.Count} sold item(s) refer to it. They are kept, but lose their product link." : "The product is deleted.") + online + (Product.Images.Count > 0 ? " Its folder with the pictures is kept." : "");
         if (!await Dialogs.ConfirmAsync($"Delete \"{Product.Name}\"?", msg, "Delete")) return;
         using (app.SuspendWatching())
         {

@@ -28,8 +28,10 @@
                 <Button Text="‹ Back" Clicked="OnBackClicked" HorizontalOptions="Start" Padding="10,2" FontSize="13" />
                 <Label Text="PRODUCT NAME" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource Pond}, Dark={StaticResource PondLight}}" />
                 <Entry Text="{Binding Product.Name}" FontSize="22" FontAttributes="Bold" Placeholder="Product name, e.g. Goose poster A3" IsReadOnly="{Binding IsReadOnly}" />
+                <Label Text="{Binding FolderText, StringFormat='Folder: {0}'}" Style="{StaticResource Muted}" FontSize="12" LineBreakMode="MiddleTruncation" />
             </VerticalStackLayout>
             <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                <Button Text="Show folder" Command="{Binding ShowFolderCommand}" />
                 <Button Text="Delete" Command="{Binding DeleteCommand}" />
                 <Button Text="Save" Command="{Binding SaveCommand}" Style="{StaticResource TabButtonSelected}" />
             </HorizontalStackLayout>

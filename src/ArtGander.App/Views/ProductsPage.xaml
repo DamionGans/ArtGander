@@ -36,7 +36,15 @@
             </VerticalStackLayout>
         </Grid>
 
-        <Label Grid.Row="2" Text="{Binding SummaryText}" Style="{StaticResource Muted}" />
+        <VerticalStackLayout Grid.Row="2" Spacing="6">
+            <Border Style="{StaticResource Banner}" IsVisible="{Binding HasTidy}" MaximumWidthRequest="1000" HorizontalOptions="Fill">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Label Text="{Binding TidyText}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Tidy up product folders…" Command="{Binding TidyUpCommand}" />
+                </Grid>
+            </Border>
+            <Label Text="{Binding SummaryText}" Style="{StaticResource Muted}" />
+        </VerticalStackLayout>
 
         <CollectionView Grid.Row="3" ItemsSource="{Binding Products}" SelectionMode="None">
             <CollectionView.ItemTemplate>

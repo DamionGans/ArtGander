@@ -63,7 +63,7 @@ public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, I
     {
         // 1. The newest ArtGander version: if another computer changed the product since the preview, check again first.
         var product = plan.Product;
-        if (catalog.RootPath is { } catalogRoot && Records.Products.ChangedOnDisk(catalogRoot, product))
+        if (catalog.ChangedOnDisk(product))
             return new SyncOutcome(product, false, "Changed in ArtGander (on another computer?) since the check. Check again.");
 
         // 2. The shops' newest versions: anything changed since the preview is skipped.

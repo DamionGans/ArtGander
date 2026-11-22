@@ -10,8 +10,6 @@ ArtGander treats **the file system as the source of truth**. There is no central
 {Art folder}/
   .artgander/                            library-level files; always inside the art folder
     library.json                         shared settings (currency, collections, channels, which Printify/Shopify shops)
-    products/
-      Goose_poster_A3-9e46e898.json      one file per product; links to any art pieces and their files
     orders/
       1001.json                          one file per order: items, payment, tax, production bill, shipping, tracking
     sync/
@@ -26,6 +24,14 @@ ArtGander treats **the file system as the source of truth**. There is no central
     Goose_On_The_Loose-master.tif
     Goose_On_The_Loose-transparent.png
     Goose_On_The_Loose-print-a4.pdf
+  Products/                              the products (name set in library.json as productsFolder); never an art piece
+    .artgander-products                  hidden marker
+    Goose On The Loose/                  group: every product of exactly one art piece or project
+      Goose Canvas 40x60/                one folder per product
+        .artgander-product.json          the product's details
+        Goose_Canvas_40x60-living-room.jpg   {Product_Name}-{label}.{ext}: its own pictures
+      Goose Mug/ …
+    Set of 3 Goose Prints/               a product of several pieces, or none: directly in Products
 ```
 
 ### Naming rules
@@ -125,7 +131,9 @@ UTF-8 without BOM, LF line endings, 2-space indentation, camelCase property name
 Products and sales are **not** stored in the piece (since format version 3): products have their own files and point to
 the pieces they show, so one product can show several pieces and a piece can be in many products.
 
-## `.artgander/products/{name}-{id}.json`
+## `Products/…/{Product}/.artgander-product.json`
+
+Each product has its own folder with its details file and its pictures. A product that shows **exactly one** art piece or project sits in a group folder named after that piece (`Products/{Piece}/{Product}/`), so the canvas, mug, t-shirt and bag of one piece are together; every other product sits directly in `Products/`. When a product's links change, ArtGander offers to move its folder; renaming a piece renames its group. A product folder moved by hand still works, and *Tidy up product folders* on the Products page puts it back in place. Renaming a product renames its folder and the pictures that follow `{Product_Name}-{label}.{ext}`.
 
 ```jsonc
 {
@@ -226,5 +234,6 @@ Without an amount paid, revenue is the sum of the item prices (which don't inclu
 | 1 | First format. |
 | 2 | Projects: `type` (piece/project), `status`, `pieceOrder`, bundle `includes`. Upgrading sets `"type": "piece"` and `"status": "finished"`. ArtGander 0.1 opens version-2 files read-only, so update every computer. |
 | 3 | Products and orders get their own files. Upgrading moves each piece's `products` to `.artgander/products/` and its `sales` to order lines in `.artgander/orders/` (ids are kept; safe to interrupt and rerun), then removes them from the piece. ArtGander 0.2 opens version-3 files read-only, so update every computer. |
+| Library 4 | Products move from `.artgander/products/*.json` into their own visible folders under `Products/` (grouped per art piece), where their pictures go. The old files are kept in `.artgander/backup/v3-products-{date}/`. Pieces are unchanged. ArtGander 0.3 doesn't see products in folders, and a product it saves the old way is picked up again (the newer copy wins), but update every computer. |
 
 To change the format: bump `CurrentSchema.Version`, add an `IMigration` with `FromVersion` = the previous version, register it in `MigrationCatalog.All`, and add a row to this table.

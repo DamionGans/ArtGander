@@ -48,7 +48,7 @@ public class ProductTests
         Assert.Equal(1, result.Products);
         Assert.Equal(2, result.OrderLines);
 
-        var product = Assert.Single(Records.Products.LoadAll(lib.Root));
+        var product = Assert.Single(new ProductStore(lib.Root, null).LoadAll());
         Assert.Equal(Guid.Parse("22222222-2222-2222-2222-222222222222"), product.Id);
         Assert.Equal("Goose mug", product.Name);
         Assert.Equal([doc.Piece.Id], product.Pieces);
@@ -93,7 +93,7 @@ public class ProductTests
         var again = store.Load(folder);
         LibraryMigrator.Run(lib.Root, [again], store, catalog);
 
-        Assert.Single(Records.Products.LoadAll(lib.Root));
+        Assert.Single(new ProductStore(lib.Root, null).LoadAll());
         Assert.Equal(2, Records.Orders.LoadAll(lib.Root).Sum(o => o.Lines.Count));
         Assert.NotNull(copy);
     }
@@ -102,32 +102,181 @@ public class ProductTests
     public void Saving_a_product_changed_elsewhere_is_refused()
     {
         using var lib = new TempLibrary();
+        var store = new ProductStore(lib.Root, null);
         var mine = new Product { Name = "Poster" };
-        Records.Products.Save(lib.Root, mine);
+        store.Save(mine);
 
-        var theirs = Records.Products.Reload(lib.Root, mine)!;
+        var theirs = store.Reload(mine)!;
         theirs.Price = 30;
-        Records.Products.Save(lib.Root, theirs);
+        store.Save(theirs);
 
         mine.Price = 25;
-        Assert.True(Records.Products.ChangedOnDisk(lib.Root, mine));
-        Assert.Throws<ConcurrentEditException>(() => Records.Products.Save(lib.Root, mine));
-        Assert.Equal(30, Records.Products.Reload(lib.Root, mine)!.Price);
+        Assert.True(store.ChangedOnDisk(mine));
+        Assert.Throws<ConcurrentEditException>(() => store.Save(mine));
+        Assert.Equal(30, store.Reload(mine)!.Price);
     }
 
     [Fact]
-    public void Renaming_a_product_renames_its_file()
+    public void Renaming_a_product_renames_its_folder_and_pictures()
     {
         using var lib = new TempLibrary();
+        var store = new ProductStore(lib.Root, null);
         var product = new Product { Name = "Poster" };
-        Records.Products.Save(lib.Root, product);
-        var first = product.StoredFileName;
-        product.Name = "Goose poster A3";
-        Records.Products.Save(lib.Root, product);
+        store.Save(product);
+        var folder = ProductStore.FolderOf(product)!;
+        Assert.Equal(Path.Combine(lib.Root, "Products", "Poster"), folder);
+        File.WriteAllText(Path.Combine(folder, "Poster-living-room.jpg"), "jpg");
+        File.WriteAllText(Path.Combine(folder, "my own name.jpg"), "jpg");
+        product.Images.Add(new ProductImage { FileName = "Poster-living-room.jpg", Label = "living-room" });
+        product.Images.Add(new ProductImage { FileName = "my own name.jpg" });
+        store.Save(product);
 
-        Assert.NotEqual(first, product.StoredFileName);
-        Assert.StartsWith("Goose_poster_A3-", product.StoredFileName);
-        Assert.Single(Directory.GetFiles(Records.Products.FolderFor(lib.Root)));
+        product.Name = "Goose poster A3";
+        store.Save(product);
+
+        var renamed = Path.Combine(lib.Root, "Products", "Goose poster A3");
+        Assert.Equal(Path.Combine(renamed, ProductStore.FileName), product.StoredFileName);
+        Assert.False(Directory.Exists(folder));
+        Assert.True(File.Exists(Path.Combine(renamed, "Goose_poster_A3-living-room.jpg")));
+        Assert.True(File.Exists(Path.Combine(renamed, "my own name.jpg"))); // not following the convention: left alone
+        Assert.Equal("Goose_poster_A3-living-room.jpg", product.Images[0].FileName);
+        Assert.Equal("Goose_poster_A3-living-room.jpg", Assert.Single(store.LoadAll()).Images[0].FileName);
+    }
+
+    [Fact]
+    public void Products_of_one_art_piece_are_grouped_in_its_folder()
+    {
+        using var lib = new TempLibrary();
+        var goose = Guid.NewGuid();
+        var book = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [goose] = "Goose On The Loose", [book] = "Goose Book" };
+        var catalog = new ProductCatalog();
+        catalog.SetLoaded(lib.Root, []);
+        catalog.GroupNameFor = id => names.GetValueOrDefault(id);
+
+        var canvas = new Product { Name = "Goose Canvas", Pieces = [goose] };
+        var mug = new Product { Name = "Goose Mug", Pieces = [goose] };
+        var bookProduct = new Product { Name = "Hardcover", Pieces = [book] };
+        var set = new Product { Name = "Set of 3", Pieces = [goose, book] };
+        var loose = new Product { Name = "Gift card" };
+        foreach (var p in new[] { canvas, mug, bookProduct, set, loose }) catalog.Save(p);
+
+        string Rel(Product p) => Path.GetRelativePath(lib.Root, ProductCatalog.FolderOf(p)!);
+        Assert.Equal(Path.Combine("Products", "Goose On The Loose", "Goose Canvas"), Rel(canvas));
+        Assert.Equal(Path.Combine("Products", "Goose On The Loose", "Goose Mug"), Rel(mug));
+        Assert.Equal(Path.Combine("Products", "Goose Book", "Hardcover"), Rel(bookProduct)); // a project groups too
+        Assert.Equal(Path.Combine("Products", "Set of 3"), Rel(set));
+        Assert.Equal(Path.Combine("Products", "Gift card"), Rel(loose));
+        Assert.Empty(catalog.PlanTidy());
+
+        // Unlinking from the piece: the folder isn't moved silently, but the move is offered.
+        mug.Pieces.Clear();
+        catalog.Save(mug);
+        Assert.Equal(Path.Combine("Products", "Gift card".Replace("Gift card", "Goose Mug")), catalog.PendingMove(mug));
+        Assert.True(catalog.MoveToPlace(mug));
+        Assert.Equal(Path.Combine("Products", "Goose Mug"), Rel(mug));
+
+        // Moving the last product out removes the empty group.
+        canvas.Pieces.Clear();
+        catalog.Save(canvas);
+        catalog.MoveToPlace(canvas);
+        Assert.False(Directory.Exists(Path.Combine(lib.Root, "Products", "Goose On The Loose")));
+
+        // All five are found again, one or two levels deep.
+        Assert.Equal(5, new ProductStore(lib.Root, null).LoadAll().Count);
+    }
+
+    [Fact]
+    public void Renaming_an_art_piece_renames_its_product_group()
+    {
+        using var lib = new TempLibrary();
+        var store = new ArtPieceStore();
+        var catalog = new ProductCatalog();
+        catalog.SetLoaded(lib.Root, []);
+        var service = new PieceService(store, catalog);
+        var doc = service.CreatePiece(lib.Root, "Goose");
+        catalog.GroupNameFor = id => id == doc.Piece.Id ? doc.FolderName : null;
+        var mug = new Product { Name = "Mug", Pieces = [doc.Piece.Id] };
+        catalog.Save(mug);
+        Assert.True(Directory.Exists(Path.Combine(lib.Root, "Products", "Goose", "Mug")));
+
+        service.RenamePiece(doc, "Goose On The Loose");
+
+        Assert.False(Directory.Exists(Path.Combine(lib.Root, "Products", "Goose")));
+        Assert.Equal(Path.Combine(lib.Root, "Products", "Goose On The Loose", "Mug", ProductStore.FileName), mug.StoredFileName);
+        Assert.Empty(catalog.PlanTidy());
+    }
+
+    [Fact]
+    public void A_product_moved_by_hand_is_found_and_offered_in_tidy_up()
+    {
+        using var lib = new TempLibrary();
+        var goose = Guid.NewGuid();
+        var catalog = new ProductCatalog();
+        catalog.SetLoaded(lib.Root, []);
+        catalog.GroupNameFor = id => id == goose ? "Goose" : null;
+        var mug = new Product { Name = "Mug", Pieces = [goose] };
+        catalog.Save(mug);
+        Directory.Move(Path.Combine(lib.Root, "Products", "Goose", "Mug"), Path.Combine(lib.Root, "Products", "Mug"));
+
+        catalog.Load(lib.Root);
+        catalog.GroupNameFor = id => id == goose ? "Goose" : null;
+        var move = Assert.Single(catalog.PlanTidy());
+        Assert.Equal(Path.Combine("Products", "Goose", "Mug"), move.To);
+        Assert.Empty(catalog.Tidy());
+        Assert.True(File.Exists(Path.Combine(lib.Root, "Products", "Goose", "Mug", ProductStore.FileName)));
+    }
+
+    [Fact]
+    public void Version_3_products_move_into_folders_and_are_backed_up()
+    {
+        using var lib = new TempLibrary();
+        var goose = Guid.NewGuid();
+        var poster = new Product { Name = "Goose poster", Pieces = [goose], Price = 20 };
+        Records.LegacyProducts.Save(lib.Root, poster);
+        Records.LegacyProducts.Save(lib.Root, new Product { Name = "Gift card" });
+        Assert.True(ProductFolderMigrator.NeedsMigration(lib.Root));
+
+        var catalog = new ProductCatalog();
+        catalog.GroupNameFor = id => id == goose ? "Goose" : null;
+        var settings = new LibrarySettings();
+        var result = ProductFolderMigrator.Run(lib.Root, catalog, settings);
+
+        Assert.Empty(result.Problems);
+        Assert.Equal(2, result.Moved);
+        Assert.False(ProductFolderMigrator.NeedsMigration(lib.Root));
+        Assert.True(File.Exists(Path.Combine(lib.Root, "Products", "Goose", "Goose poster", ProductStore.FileName)));
+        Assert.True(File.Exists(Path.Combine(lib.Root, "Products", "Gift card", ProductStore.FileName)));
+        Assert.Equal(2, Directory.GetFiles(Path.Combine(lib.Root, ".artgander", "backup"), "*.json", SearchOption.AllDirectories).Length);
+
+        // An older ArtGander on another computer saves the poster the old way again: picked up, nothing duplicated.
+        poster.StoredFileName = null;
+        poster.Price = 25;
+        poster.UpdatedAt = DateTimeOffset.Now.AddMinutes(5);
+        Assert.False(Directory.Exists(Records.LegacyProducts.FolderFor(lib.Root))); // the empty old folder was removed
+        Directory.CreateDirectory(Records.LegacyProducts.FolderFor(lib.Root));
+        File.WriteAllText(Path.Combine(Records.LegacyProducts.FolderFor(lib.Root), "Goose_poster-again.json"), Schema.ArtGanderJson.Serialize(poster));
+        var again = ProductFolderMigrator.Run(lib.Root, catalog, settings);
+        Assert.Equal(1, again.Updated);
+        var all = new ProductStore(lib.Root, null).LoadAll();
+        Assert.Equal(2, all.Count);
+        Assert.Equal(25, all.Single(p => p.Id == poster.Id).Price);
+    }
+
+    [Fact]
+    public void An_art_piece_called_Products_keeps_its_folder()
+    {
+        using var lib = new TempLibrary();
+        var store = new ArtPieceStore();
+        new PieceService(store).CreatePiece(lib.Root, "Products");
+        Assert.Equal("Shop Products", ProductFolderMigrator.ChooseProductsFolder(lib.Root, "Products"));
+
+        new ProductStore(lib.Root, "Shop Products").Save(new Product { Name = "Mug" });
+        Assert.Equal("Shop Products", ProductFolderMigrator.ChooseProductsFolder(lib.Root, "Shop Products"));
+        var settings = new LibrarySettings { ProductsFolder = "Shop Products" };
+        LibrarySettingsStore.Save(lib.Root, settings);
+        var scanned = new Library.LibraryScanner(store).Scan(lib.Root, TestContext.Current.CancellationToken);
+        Assert.Equal("Products", Assert.Single(scanned).Title); // the piece shows; the products folder doesn't
     }
 
     [Fact]

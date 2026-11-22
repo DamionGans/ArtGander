@@ -19,6 +19,12 @@ public sealed partial class LibrarySettings : ModelBase
     public ObservableCollection<string> FileKinds { get; set; } = [.. FileKind.Defaults];
 
     /// <summary>
+    /// The folder in the art folder that holds the products, one folder per product, grouped per art piece
+    /// (default "Products"). It is never shown as an art piece.
+    /// </summary>
+    public string ProductsFolder { get; set; } = "Products";
+
+    /// <summary>
     /// Which Printify shop and Shopify store this library is connected to. Only ids live here (shared by all computers);
     /// the secret keys are stored per computer in the operating system's keychain.
     /// </summary>

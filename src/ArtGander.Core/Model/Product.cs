@@ -38,6 +38,18 @@ public sealed partial class Product : ModelBase, IStoredRecord
     /// <summary>The specific files used, e.g. the transparent version. Independent of the files' version labels.</summary>
     public ObservableCollection<ProductFile> Files { get; set; } = [];
 
+    /// <summary>
+    /// The product's own pictures (photos of the made product, mockups…), stored in the product's folder.
+    /// In shop order: the first one is the main picture.
+    /// </summary>
+    public ObservableCollection<ProductImage> Images { get; set; } = [];
+
+    /// <summary>Which pictures the shop shows: Printify's mockups (the default for Printify products) or your own pictures.</summary>
+    [ObservableProperty] public partial PictureMode Pictures { get; set; } = PictureMode.PrintifyMockups;
+
+    /// <summary>Self-made products always use their own pictures; Printify products use the chosen mode.</summary>
+    [JsonIgnore] public PictureMode EffectivePictures => Type == ProductType.PrintOnDemand ? Pictures : PictureMode.Own;
+
     /// <summary>The default price. Variants without their own price use it.</summary>
     [ObservableProperty] public partial decimal? Price { get; set; }
     /// <summary>The default production cost. Variants without their own cost use it.</summary>
@@ -95,6 +107,54 @@ public sealed partial class ProductFile : ModelBase
 {
     [ObservableProperty] public partial Guid PieceId { get; set; }
     [ObservableProperty] public partial string FileName { get; set; } = "";
+}
+
+[JsonConverter(typeof(CamelCaseEnumConverter<PictureMode>))]
+public enum PictureMode { PrintifyMockups, Own }
+
+[JsonConverter(typeof(CamelCaseEnumConverter<PictureSource>))]
+public enum PictureSource { Own, Printify, Shopify }
+
+/// <summary>The kinds of product pictures.</summary>
+public static class ProductImageKind
+{
+    public const string Photo = "photo";
+    public const string Mockup = "mockup";
+    public const string Lifestyle = "lifestyle";
+    public const string Detail = "detail";
+    public const string SizeChart = "size chart";
+    public const string Other = "other";
+    public static IReadOnlyList<string> All { get; } = [Photo, Mockup, Lifestyle, Detail, SizeChart, Other];
+}
+
+/// <summary>A picture of a product, in the product's folder: <c>{Product_Name}-{label}.{ext}</c>.</summary>
+public sealed partial class ProductImage : ModelBase
+{
+    [ObservableProperty] public partial string FileName { get; set; } = "";
+    /// <summary>The label in the file name (Name-<b>label</b>.ext).</summary>
+    [ObservableProperty] public partial string Label { get; set; } = "";
+    [ObservableProperty] public partial string Kind { get; set; } = ProductImageKind.Photo;
+    /// <summary>The art piece or project this picture shows, or null.</summary>
+    [ObservableProperty] public partial Guid? PieceId { get; set; }
+    /// <summary>The description for people who can't see the picture (also used by the shop).</summary>
+    [ObservableProperty] public partial string Alt { get; set; } = "";
+    /// <summary>Where it came from: added here, or downloaded from Printify or Shopify.</summary>
+    [ObservableProperty] public partial PictureSource Source { get; set; } = PictureSource.Own;
+    /// <summary>The link to the picture in the Shopify product, once uploaded or imported.</summary>
+    public ShopifyMediaLink? Shopify { get; set; }
+    /// <summary>For Printify mockups: the address it was downloaded from, to recognize it on the next import.</summary>
+    public string? PrintifySrc { get; set; }
+    public DateTimeOffset? AddedAt { get; set; }
+}
+
+public sealed class ShopifyMediaLink
+{
+    public string MediaId { get; set; } = "";
+    /// <summary>The file's content hash when it was uploaded or downloaded, to notice a changed picture.</summary>
+    public string Hash { get; set; } = "";
+    /// <summary>Uploaded by ArtGander (only those may ever be removed from Shopify by ArtGander).</summary>
+    public bool UploadedByArtGander { get; set; }
+    public string Alt { get; set; } = "";
 }
 
 /// <summary>One variant: a size, color or format with its own price.</summary>

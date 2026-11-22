@@ -15,7 +15,7 @@ public sealed class LibraryScanner(ArtPieceStore store)
     {
         if (!Directory.Exists(rootPath)) return [];
 
-        var folders = EnumeratePieceFolders(rootPath).ToList();
+        var folders = EnumeratePieceFolders(rootPath, ProductsFolderOf(rootPath)).ToList();
         var results = new PieceFolder[folders.Count];
         // Network shares have high latency per file, so reading folders in parallel pays off a lot.
         Parallel.For(0, folders.Count, new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = 8 },
@@ -66,7 +66,15 @@ public sealed class LibraryScanner(ArtPieceStore store)
             .ThenBy(c => c.Title, NameRules.NaturalComparer)
             .ToList();
 
-    public static IEnumerable<string> EnumeratePieceFolders(string rootPath)
+    /// <summary>The products folder of the library (never an art piece), from its settings.</summary>
+    public static string ProductsFolderOf(string rootPath)
+    {
+        try { return LibrarySettingsStore.Load(rootPath).ProductsFolder; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { return ProductStore.DefaultFolderName; }
+    }
+
+    /// <param name="productsFolder">At the top of the art folder: the products folder, which is skipped.</param>
+    public static IEnumerable<string> EnumeratePieceFolders(string rootPath, string? productsFolder = null)
     {
         IEnumerable<string> dirs;
         try { dirs = Directory.EnumerateDirectories(rootPath).ToList(); }
@@ -79,6 +87,8 @@ public sealed class LibraryScanner(ArtPieceStore store)
                 continue;
             if (NameRules.NamesEqual(name, "#recycle") || NameRules.NamesEqual(name, "@eaDir")) // NAS system folders
                 continue;
+            if (productsFolder is not null && NameRules.NamesEqual(name, productsFolder))
+                continue;
             yield return dir;
         }
     }
@@ -87,11 +97,11 @@ public sealed class LibraryScanner(ArtPieceStore store)
     /// A cheap fingerprint of the library state (folder names plus metadata timestamps and sizes).
     /// Comparing fingerprints detects changes from other computers on shares where file-change notifications don't work.
     /// </summary>
-    public static string Fingerprint(string rootPath, IEnumerable<string>? projectFolders = null)
+    public static string Fingerprint(string rootPath, IEnumerable<string>? projectFolders = null, string? productsFolder = null)
     {
         var hash = new HashCode();
-        var dirs = EnumeratePieceFolders(rootPath)
-            .Concat((projectFolders ?? []).Where(Directory.Exists).SelectMany(EnumeratePieceFolders));
+        var dirs = EnumeratePieceFolders(rootPath, productsFolder)
+            .Concat((projectFolders ?? []).Where(Directory.Exists).SelectMany(p => EnumeratePieceFolders(p)));
         foreach (var dir in dirs.Order(StringComparer.Ordinal))
         {
             hash.Add(dir, StringComparer.Ordinal);

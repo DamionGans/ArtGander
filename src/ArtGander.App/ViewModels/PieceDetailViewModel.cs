@@ -462,6 +462,7 @@ public sealed partial class PieceDetailViewModel(
         try
         {
             using (app.SuspendWatching()) catalog.Link(product, Doc.Piece.Id);
+            await ProductsViewModel.OfferMoveAsync(app, product);
         }
         catch (Exception ex) { await Dialogs.ErrorAsync(ex); }
         RebuildProducts();
@@ -481,6 +482,7 @@ public sealed partial class PieceDetailViewModel(
         try
         {
             using (app.SuspendWatching()) catalog.Unlink(row.Product, Doc.Piece.Id);
+            await ProductsViewModel.OfferMoveAsync(app, row.Product);
         }
         catch (Exception ex) { await Dialogs.ErrorAsync(ex); }
         RebuildProducts();

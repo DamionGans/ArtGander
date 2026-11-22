@@ -190,6 +190,13 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
 
             doc.Piece.Title = newTitle;
             store.Save(doc);
+            if (folderChanges)
+            {
+                // The products of this piece are grouped under its folder name: the group follows. If that fails,
+                // "Tidy up product folders" offers the move later.
+                try { catalog?.RenameGroup(oldFolderName, newFolderName); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
         }
         catch
         {

@@ -70,7 +70,7 @@ public class LibraryTests
         Assert.True(Directory.Exists(Path.Combine(lib.Root, "Swan Lake")));
         Assert.True(Directory.Exists(Path.Combine(lib.Root, "Goose Book", "Page 1")));
         Assert.True(File.Exists(Path.Combine(lib.Root, "Goose", "Goose-scan-from-phone.jpg")));
-        Assert.StartsWith("Swan_Lake-", Assert.Single(Records.Products.LoadAll(lib.Root)).Files[0].FileName); // product link followed
+        Assert.StartsWith("Swan_Lake-", Assert.Single(new ProductStore(lib.Root, null).LoadAll()).Files[0].FileName); // product link followed
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class LibraryTests
         service.ApplyConvention(doc, entry);
 
         Assert.Equal("Goose-scan-from-phone.jpg", entry.FileName);
-        Assert.Equal("Goose-scan-from-phone.jpg", Assert.Single(Records.Products.LoadAll(lib.Root)).Files[0].FileName);
+        Assert.Equal("Goose-scan-from-phone.jpg", Assert.Single(new ProductStore(lib.Root, null).LoadAll()).Files[0].FileName);
         Assert.True(File.Exists(Path.Combine(doc.FolderPath, "Goose-scan-from-phone.jpg")));
     }
 
@@ -228,7 +228,7 @@ public class LibraryTests
         Assert.True(File.Exists(Path.Combine(doc.FolderPath, "Goose_On_The_Loose-transparent.png")));
         var reloaded = _store.Load(doc.FolderPath);
         Assert.Equal("Goose On The Loose", reloaded.Piece.Title);
-        Assert.Equal("Goose_On_The_Loose-transparent.png", Assert.Single(Records.Products.LoadAll(lib.Root)).Files[0].FileName);
+        Assert.Equal("Goose_On_The_Loose-transparent.png", Assert.Single(new ProductStore(lib.Root, null).LoadAll()).Files[0].FileName);
     }
 
     [Fact]

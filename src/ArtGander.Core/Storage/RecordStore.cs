@@ -114,7 +114,8 @@ public sealed class RecordStore<T>(
 /// <summary>The stores for the library-level records.</summary>
 public static class Records
 {
-    public static RecordStore<Product> Products { get; } = new(
+    /// <summary>Products as stored by format 3 (<c>.artgander/products/*.json</c>); only read to upgrade them to product folders.</summary>
+    public static RecordStore<Product> LegacyProducts { get; } = new(
         "products",
         p => $"{Naming.NameRules.ToFileBaseName(Naming.NameRules.ToFolderName(string.IsNullOrWhiteSpace(p.Name) ? "Product" : p.Name))}-{p.Id.ToString("N")[..8]}",
         ArtGanderJson.DeserializeProduct,
