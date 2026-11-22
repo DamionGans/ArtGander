@@ -57,6 +57,72 @@ public sealed class ProtectionService(AppState app)
         return Path.Combine(dir, $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}");
     }
 
+    /// <summary>Mistcoat, or a message saying how to set it up (shown to the user) when it's not found.</summary>
+    public async Task<MistcoatRunner?> FindAsync()
+    {
+        if (Runner is { } runner) return runner;
+        await Dialogs.AlertAsync("Mistcoat not found",
+            "ArtGander uses Mistcoat to protect images against AI training, but couldn't find it on this computer. "
+            + "Install Mistcoat, then choose the program in Settings → Image protection.");
+        return null;
+    }
+
+    /// <summary>
+    /// Protects the row's image into a temporary file, shows progress on the row, then lets <paramref name="addResult"/>
+    /// put the protected copy where it belongs (it returns the message shown on the row).
+    /// </summary>
+    /// <param name="rowNow">The row currently shown for this file (rows are rebuilt after file operations).</param>
+    public async Task RunAsync(ViewModels.ProtectableRow row, Func<ViewModels.ProtectableRow?> rowNow, MistcoatOptions options, string extension,
+        Func<string, MistcoatResult, Task<string>> addResult)
+    {
+        if (!row.CanStartProtect) return;
+        if (await FindAsync() is not { } runner) return;
+
+        var output = TempOutput(extension);
+        using var cancel = new CancellationTokenSource();
+        row.ProtectCancel = cancel;
+        row.ProtectMessage = "";
+        row.ProtectStage = "Starting Mistcoat…";
+        row.ProtectFraction = 0;
+        row.IsProtecting = true;
+
+        var progress = new Progress<MistcoatProgress>(p =>
+        {
+            if (rowNow() is not { } r) return;
+            r.ProtectStage = p.Stage;
+            r.ProtectFraction = p.Fraction;
+        });
+
+        MistcoatResult result;
+        try { result = await runner.ProtectAsync(row.FullPath, output, options, progress, cancel.Token); }
+        catch (OperationCanceledException) { result = new MistcoatResult(false, null, "Cancelled.", null, null, null, []); }
+        catch (Exception ex) { result = new MistcoatResult(false, null, ex.Message, null, null, null, []); }
+
+        string message;
+        if (result.Ok && File.Exists(output))
+        {
+            try { message = await addResult(output, result); }
+            catch (Exception ex) { message = "Mistcoat finished, but the protected copy couldn't be added: " + ex.Message; }
+        }
+        else
+        {
+            message = "Not protected: " + (result.Error ?? "Mistcoat didn't produce a file.");
+        }
+        try { if (File.Exists(output)) File.Delete(output); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+
+        var current = rowNow() ?? row;
+        current.ProtectCancel = null;
+        current.IsProtecting = false;
+        current.ProtectStage = "";
+        current.ProtectMessage = message;
+    }
+
+    public static string NotesFor(MistcoatOptions options, string sourceName) =>
+        $"Protected against AI training with Mistcoat ({options.Preset}{(options.Strength is { } s ? $", strength {s:0}" : "")}) from {sourceName} on {DateTime.Now:d}.";
+
+    public static string SavedMessage(string fileName, MistcoatResult result) =>
+        $"Saved as {fileName}" + (result.Summary.Length > 0 ? $" · {result.Summary}" : "");
+
     private static string FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim() ?? "";
 }

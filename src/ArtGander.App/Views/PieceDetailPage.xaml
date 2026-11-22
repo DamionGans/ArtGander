@@ -403,6 +403,28 @@
                         </DataTemplate>
                     </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>
+
+                <Label Text="Product pictures" Style="{StaticResource SectionTitle}" IsVisible="{Binding HasProductPictures}" />
+                <Label Text="Pictures of products that show this art piece (on a project: also those of its pieces). Click one to open its product."
+                       Style="{StaticResource Muted}" IsVisible="{Binding HasProductPictures}" />
+                <FlexLayout BindableLayout.ItemsSource="{Binding ProductPictures}" Wrap="Wrap" Direction="Row" JustifyContent="Start" IsVisible="{Binding HasProductPictures}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProductPictureTile">
+                            <Border Style="{StaticResource Card}" Padding="6" Margin="0,0,8,8" WidthRequest="170">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding OpenProductPictureCommand, Source={RelativeSource AncestorType={x:Type vm:PieceDetailViewModel}}, x:DataType=vm:PieceDetailViewModel}" CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="2">
+                                    <Border Style="{StaticResource Thumb}" HeightRequest="140">
+                                        <Image Source="{Binding Thumbnail}" Aspect="AspectFit" />
+                                    </Border>
+                                    <Label Text="{Binding ProductName}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Caption}" Style="{StaticResource Muted}" FontSize="12" LineBreakMode="TailTruncation" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </FlexLayout>
             </VerticalStackLayout>
         </ScrollView>
 

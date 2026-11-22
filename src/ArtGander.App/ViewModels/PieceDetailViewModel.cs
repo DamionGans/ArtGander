@@ -423,7 +423,33 @@ public sealed partial class PieceDetailViewModel(
         foreach (var p in catalog.All.Except(linked)) AvailableProducts.Add(p);
         SelectedAvailableProduct = null;
         OnPropertyChanged(nameof(HasLinkedProducts));
+        RebuildProductPictures();
     }
+
+    /// <summary>Product pictures that show this piece (for a project: also its pieces).</summary>
+    public ObservableCollection<ProductPictureTile> ProductPictures { get; } = [];
+    public bool HasProductPictures => ProductPictures.Count > 0;
+
+    private void RebuildProductPictures()
+    {
+        ProductPictures.Clear();
+        if (Doc is null) { OnPropertyChanged(nameof(HasProductPictures)); return; }
+        var titles = new Dictionary<Guid, string> { [Doc.Piece.Id] = Doc.Piece.Title };
+        if (app.FindFolder(Doc.FolderPath) is { } folder)
+            foreach (var child in folder.Children)
+                if (child.Document is { } d) titles[d.Piece.Id] = d.Piece.Title;
+        foreach (var picture in catalog.ImagesFor(titles.Keys))
+        {
+            var from = picture.Image.PieceId is { } id && id != Doc.Piece.Id && titles.TryGetValue(id, out var t) ? t : null;
+            var tile = new ProductPictureTile(picture, from);
+            ProductPictures.Add(tile);
+            _ = tile.LoadThumbnailAsync(thumbs);
+        }
+        OnPropertyChanged(nameof(HasProductPictures));
+    }
+
+    [RelayCommand]
+    private void OpenProductPicture(ProductPictureTile? tile) => Ui.Fire(() => tile is null ? Task.CompletedTask : ProductsViewModel.OpenProductAsync(tile.Picture.Product.Id, "images"));
 
     private void RebuildSales()
     {
@@ -506,6 +532,22 @@ public sealed partial class PieceDetailViewModel(
 
     [RelayCommand]
     private void RefreshSalesSummary() => RebuildSales();
+}
+
+/// <summary>A product picture on an art piece's Products tab.</summary>
+public sealed partial class ProductPictureTile(ProductPicture picture, string? fromPiece) : ObservableObject
+{
+    public ProductPicture Picture { get; } = picture;
+    public string ProductName => Picture.Product.Name;
+    /// <summary>For a project: which of its pieces the picture shows.</summary>
+    public string Caption => fromPiece is null ? Picture.Image.Label : $"{Picture.Image.Label} · from {fromPiece}";
+    [ObservableProperty] public partial ImageSource? Thumbnail { get; set; }
+
+    public async Task LoadThumbnailAsync(ThumbnailService thumbs)
+    {
+        var path = await thumbs.GetAsync(File.Exists(Picture.Path) ? Picture.Path : null);
+        if (path is not null) MainThread.BeginInvokeOnMainThread(() => Thumbnail = ImageSource.FromFile(path));
+    }
 }
 
 /// <summary>A product shown on an art piece's Products tab.</summary>

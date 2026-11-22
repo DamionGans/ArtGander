@@ -162,7 +162,7 @@ public sealed class ProductStore
             && !IsNumberedVariant(Path.GetFileName(oldFolder), wanted))
         {
             var target = FreeFolder(Path.GetDirectoryName(oldFolder)!, wanted, own: oldFolder);
-            renamedImages = RenameImages(product, Path.GetFileName(oldFolder), Path.GetFileName(target), oldFolder);
+            renamedImages = RenameImages(product, ConventionName(Path.GetFileName(oldFolder)), ConventionName(Path.GetFileName(target)), oldFolder);
             try { MoveDirectory(oldFolder, target); }
             catch { UndoImages(product, renamedImages, oldFolder); throw; }
             folder = target;
@@ -173,7 +173,7 @@ public sealed class ProductStore
         {
             // Only the case changed.
             var target = Path.Combine(Path.GetDirectoryName(oldFolder)!, wanted);
-            renamedImages = RenameImages(product, Path.GetFileName(oldFolder), wanted, oldFolder);
+            renamedImages = RenameImages(product, ConventionName(Path.GetFileName(oldFolder)), wanted, oldFolder);
             MoveDirectory(oldFolder, target);
             folder = target;
             renamedFrom = oldFolder;
@@ -337,6 +337,13 @@ public sealed class ProductStore
     }
 
     // ---- Helpers ------------------------------------------------------------------------------------
+
+    /// <summary>The name a product's pictures follow: the folder name without a " (2)" added for uniqueness.</summary>
+    public static string ConventionName(string folderName)
+    {
+        var open = folderName.LastIndexOf(" (", StringComparison.Ordinal);
+        return open > 0 && folderName.EndsWith(')') && int.TryParse(folderName[(open + 2)..^1], out _) ? folderName[..open] : folderName;
+    }
 
     /// <summary>"Goose Mug (2)" is fine for a product called "Goose Mug": it was numbered because the name was taken.</summary>
     private static bool IsNumberedVariant(string folderName, string wanted) =>

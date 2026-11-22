@@ -23,6 +23,9 @@
     </ContentPage.MenuBarItems>
 
     <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="24,16,24,0" RowSpacing="10">
+        <Grid.GestureRecognizers>
+            <DropGestureRecognizer AllowDrop="True" Drop="OnDrop" />
+        </Grid.GestureRecognizers>
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                 <Button Text="‹ Back" Clicked="OnBackClicked" HorizontalOptions="Start" Padding="10,2" FontSize="13" />
@@ -43,11 +46,166 @@
 
         <HorizontalStackLayout Grid.Row="2" Spacing="6">
             <Button Text="Overview" Command="{Binding SelectTabCommand}" CommandParameter="overview" />
+            <Button Text="Pictures" Command="{Binding SelectTabCommand}" CommandParameter="images" />
             <Button Text="Art" Command="{Binding SelectTabCommand}" CommandParameter="art" />
             <Button Text="Prices &amp; costs" Command="{Binding SelectTabCommand}" CommandParameter="prices" />
             <Button Text="Shops" Command="{Binding SelectTabCommand}" CommandParameter="channels" />
             <Button Text="Sales" Command="{Binding SelectTabCommand}" CommandParameter="sales" />
         </HorizontalStackLayout>
+
+        <!-- ============ PICTURES ============ -->
+        <ScrollView Grid.Row="3" IsVisible="{Binding IsImages}">
+            <VerticalStackLayout Spacing="10" Padding="0,0,0,24">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <Label Text="The product's own pictures: photos of the finished product, mockups, details. They are kept in the product's folder as {Product_Name}-{label}.{ext}. You can also drop pictures here (Windows)."
+                           Style="{StaticResource Muted}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Add pictures…" Command="{Binding AddImagesCommand}" />
+                </Grid>
+                <Grid ColumnDefinitions="240,*" ColumnSpacing="12" IsVisible="{Binding IsPrintifyProduct}">
+                    <VerticalStackLayout>
+                        <Label Text="Pictures in the shop" Style="{StaticResource FieldLabel}" Margin="0" />
+                        <Picker ItemsSource="{x:Static vm:ProductDetailViewModel.PictureModes}" SelectedItem="{Binding SelectedPictureMode}"
+                                ItemDisplayBinding="{Binding Title, x:DataType=vm:PictureModeChoice}" />
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1" Text="{Binding PictureModeText}" Style="{StaticResource Muted}" VerticalOptions="End" />
+                </Grid>
+                <Label Text="{Binding PictureModeText}" Style="{StaticResource Muted}" IsVisible="{Binding IsPrintifyProduct, Converter={StaticResource Not}}" />
+                <Label Text="{Binding ImagesNotice}" Style="{StaticResource WarningText}" IsVisible="{Binding ImagesNotice, Converter={StaticResource HasValue}}" />
+                <Label Text="No pictures yet. Add photos of the finished product, or mockups." Style="{StaticResource Muted}" IsVisible="{Binding HasImages, Converter={StaticResource Not}}" Margin="0,8" />
+
+                <FlexLayout BindableLayout.ItemsSource="{Binding Images}" Wrap="Wrap" Direction="Row" JustifyContent="Start" AlignItems="Start">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProductImageRow">
+                            <Border Style="{StaticResource Card}" Padding="10" Margin="0,0,10,10" WidthRequest="300">
+                                <VerticalStackLayout Spacing="4">
+                                    <Grid>
+                                        <Border Style="{StaticResource Thumb}" HeightRequest="200">
+                                            <Image Source="{Binding Thumbnail}" Aspect="AspectFit" />
+                                        </Border>
+                                        <Border Style="{StaticResource Banner}" Padding="6,2" Margin="6" HorizontalOptions="Start" VerticalOptions="Start" IsVisible="{Binding IsMain}">
+                                            <Label Text="Main picture" FontSize="11" />
+                                        </Border>
+                                    </Grid>
+                                    <Label Text="{Binding Image.FileName}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
+                                    <Label Text="{Binding SourceText}" Style="{StaticResource Muted}" FontSize="12" IsVisible="{Binding HasSourceText}" />
+                                    <Label Text="⚠ Missing on disk: moved, renamed or deleted outside ArtGander" Style="{StaticResource WarningText}" IsVisible="{Binding IsMissing}" />
+                                    <Label Text="Label (renames the file)" Style="{StaticResource FieldLabel}" Margin="0" />
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                        <Entry Text="{Binding EditLabel}" Placeholder="e.g. living-room, mockup-front" />
+                                        <Button Grid.Column="1" Text="Rename" IsVisible="{Binding LabelChanged}"
+                                                Command="{Binding RenameImageCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                    </Grid>
+                                    <Label Text="Kind" Style="{StaticResource FieldLabel}" Margin="0" />
+                                    <Picker ItemsSource="{x:Static vm:ProductImageRow.Kinds}" SelectedItem="{Binding Image.Kind, Converter={StaticResource KeepValue}}"
+                                            ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                    <Label Text="Shows art piece or project" Style="{StaticResource FieldLabel}" Margin="0" />
+                                    <Picker ItemsSource="{Binding PieceChoices}" SelectedItem="{Binding SelectedPiece}" ItemDisplayBinding="{Binding Title, x:DataType=vm:PieceChoice}" />
+                                    <Label Text="Description for people who can't see it (alt text, also used by the shop)" Style="{StaticResource FieldLabel}" Margin="0" />
+                                    <Entry Text="{Binding Image.Alt}" Placeholder="e.g. Goose poster above a sofa" />
+                                    <HorizontalStackLayout Spacing="4" Margin="0,6,0,0">
+                                        <Button Text="←" ToolTipProperties.Text="Earlier in the shop" Command="{Binding MoveImageEarlierCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                        <Button Text="→" ToolTipProperties.Text="Later in the shop" Command="{Binding MoveImageLaterCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                        <Button Text="Make main" IsVisible="{Binding IsMain, Converter={StaticResource Not}}" Command="{Binding MakeMainImageCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                    </HorizontalStackLayout>
+                                    <HorizontalStackLayout Spacing="4">
+                                        <Button Text="Open" Command="{Binding OpenImageCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                        <Button Text="Show" Command="{Binding ShowImageCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                        <Button Text="Remove" Command="{Binding RemoveImageCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                    </HorizontalStackLayout>
+                                    <!-- Protection against AI training (Mistcoat) -->
+                                    <VerticalStackLayout Spacing="4" IsVisible="{Binding CanProtect}" Margin="0,4,0,0">
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Button Text="Protect" IsEnabled="{Binding CanStartProtect}" ToolTipProperties.Text="Make a copy protected against AI training with Mistcoat"
+                                                    Command="{Binding QuickProtectImageCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                            <Button Text="Options…" IsEnabled="{Binding CanStartProtect}"
+                                                    Command="{Binding ShowImageProtectOptionsCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                        </HorizontalStackLayout>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding IsProtecting}">
+                                            <VerticalStackLayout>
+                                                <ProgressBar Progress="{Binding ProtectFraction}" />
+                                                <Label Text="{Binding ProtectStage}" Style="{StaticResource Muted}" FontSize="12" LineBreakMode="TailTruncation" />
+                                            </VerticalStackLayout>
+                                            <Button Grid.Column="1" Text="Cancel" Command="{Binding CancelImageProtectCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                        </Grid>
+                                        <Label Text="{Binding ProtectMessage}" IsVisible="{Binding HasProtectMessage}" Style="{StaticResource Muted}" FontSize="12" />
+                                        <ContentView IsVisible="{Binding HasAdvanced}">
+                                            <Border Style="{StaticResource Banner}" BindingContext="{Binding Advanced}" x:DataType="vm:ProtectOptionsViewModel" Padding="8">
+                                                <VerticalStackLayout Spacing="4">
+                                                    <Label Text="Preset" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                    <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.Presets}" SelectedItem="{Binding Preset}" ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                                                    <Label Text="{Binding PresetBlurb}" Style="{StaticResource Muted}" FontSize="12" />
+                                                    <Label Text="{Binding StrengthText, StringFormat='Strength: {0} of 100'}" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                    <Slider Minimum="0" Maximum="100" Value="{Binding Strength}" />
+                                                    <Label Text="Techniques" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Passes}">
+                                                        <BindableLayout.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:PassToggle">
+                                                                <HorizontalStackLayout Spacing="2">
+                                                                    <CheckBox IsChecked="{Binding IsOn}" />
+                                                                    <Label Text="{Binding Text}" VerticalOptions="Center" FontSize="12" />
+                                                                </HorizontalStackLayout>
+                                                            </DataTemplate>
+                                                        </BindableLayout.ItemTemplate>
+                                                    </VerticalStackLayout>
+                                                    <HorizontalStackLayout Spacing="2"><CheckBox IsChecked="{Binding Harden}" /><Label Text="Harden against re-compression" VerticalOptions="Center" FontSize="12" /></HorizontalStackLayout>
+                                                    <HorizontalStackLayout Spacing="2"><CheckBox IsChecked="{Binding Measure}" /><Label Text="Measure visibility and durability" VerticalOptions="Center" FontSize="12" /></HorizontalStackLayout>
+                                                    <HorizontalStackLayout Spacing="2"><CheckBox IsChecked="{Binding UseGpu}" /><Label Text="Use the graphics card" VerticalOptions="Center" FontSize="12" /></HorizontalStackLayout>
+                                                    <HorizontalStackLayout Spacing="2"><CheckBox IsChecked="{Binding Metadata}" /><Label Text="Embed &quot;do not train&quot;, credit and copyright" VerticalOptions="Center" FontSize="12" /></HorizontalStackLayout>
+                                                    <VerticalStackLayout IsVisible="{Binding Metadata}" Spacing="2">
+                                                        <Label Text="Credit (artist name)" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Entry Text="{Binding Credit}" />
+                                                        <Label Text="Copyright notice" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Entry Text="{Binding Copyright}" />
+                                                    </VerticalStackLayout>
+                                                    <Label Text="File format" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                    <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.Formats}" SelectedItem="{Binding Format}" />
+                                                    <VerticalStackLayout IsVisible="{Binding IsJpeg}">
+                                                        <Label Text="{Binding JpegQuality, StringFormat='JPEG quality: {0:0}'}" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                        <Slider Minimum="70" Maximum="100" Value="{Binding JpegQuality}" />
+                                                    </VerticalStackLayout>
+                                                    <Label Text="Save as label" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                    <Entry Text="{Binding Version}" Placeholder="protected" />
+                                                    <Button Text="Protect with these options" Style="{StaticResource TabButtonSelected}"
+                                                            Command="{Binding ProtectImageWithOptionsCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                                            CommandParameter="{Binding ., Source={RelativeSource AncestorType={x:Type vm:ProductImageRow}}, x:DataType=vm:ProductImageRow}" />
+                                                    <Button Text="Open in Mistcoat's window"
+                                                            Command="{Binding OpenImageInMistcoatCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                                            CommandParameter="{Binding ., Source={RelativeSource AncestorType={x:Type vm:ProductImageRow}}, x:DataType=vm:ProductImageRow}" />
+                                                    <Button Text="Close"
+                                                            Command="{Binding ShowImageProtectOptionsCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                                            CommandParameter="{Binding ., Source={RelativeSource AncestorType={x:Type vm:ProductImageRow}}, x:DataType=vm:ProductImageRow}" />
+                                                </VerticalStackLayout>
+                                            </Border>
+                                        </ContentView>
+                                    </VerticalStackLayout>
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </FlexLayout>
+
+                <Label Text="New pictures found in the product's folder" Style="{StaticResource SectionTitle}" IsVisible="{Binding HasUntrackedImages}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding UntrackedImages}" Spacing="6">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UntrackedImageRow">
+                            <Border Style="{StaticResource Banner}">
+                                <Grid ColumnDefinitions="*,220,Auto" ColumnSpacing="10">
+                                    <Label Text="{Binding FileName}" VerticalOptions="Center" LineBreakMode="MiddleTruncation" />
+                                    <VerticalStackLayout Grid.Column="1">
+                                        <Label Text="Label" Style="{StaticResource FieldLabel}" Margin="0" />
+                                        <Entry Text="{Binding Label}" Placeholder="e.g. living-room" />
+                                    </VerticalStackLayout>
+                                    <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="End">
+                                        <Button Text="Add &amp; rename" Command="{Binding TrackImageCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                        <Button Text="Add as is" Command="{Binding TrackImageAsIsCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                    </HorizontalStackLayout>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
 
         <!-- ============ OVERVIEW ============ -->
         <ScrollView Grid.Row="3" IsVisible="{Binding IsOverview}">

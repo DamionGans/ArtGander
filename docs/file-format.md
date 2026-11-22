@@ -142,6 +142,12 @@ Each product has its own folder with its details file and its pictures. A produc
   "name": "Goose poster A3",               // the title in the shop
   "description": "<p>Honk</p>",
   "tags": ["goose", "poster"],
+  "images": [                              // the product's own pictures, in shop order (the first is the main one)
+    { "fileName": "Goose_Mug-living-room.jpg", "label": "living-room", "kind": "photo",   // photo | mockup | lifestyle | detail | size chart | other
+      "pieceId": "…",                     // the art piece or project it shows, or null
+      "alt": "Mug on a desk", "source": "own" }                                         // own | printify | shopify
+  ],
+  "pictures": "printifyMockups",           // what the shop shows for a Printify product: printifyMockups | own
   "type": "printOnDemand",                 // printOnDemand (made and shipped by Printify) | selfPrint | handmade | original | digital | other
   "status": "active",                      // draft | active | archived
   "provider": "Printify", "variant": "A3 matte",

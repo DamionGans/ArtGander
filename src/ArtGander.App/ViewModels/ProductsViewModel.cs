@@ -153,8 +153,10 @@ public sealed partial class ProductsViewModel : ObservableObject
     [RelayCommand]
     private Task NewProductAsync() => _app.HasRoot ? OpenNewProductAsync(null) : Dialogs.AlertAsync("No art folder", "Choose your art folder first.");
 
-    public static Task OpenProductAsync(Guid id) =>
-        Shell.Current.GoToAsync(AppShell.ProductRoute, new ShellNavigationQueryParameters { ["id"] = id.ToString() });
+    public static Task OpenProductAsync(Guid id, string? tab = null) =>
+        Shell.Current.GoToAsync(AppShell.ProductRoute, tab is null
+            ? new ShellNavigationQueryParameters { ["id"] = id.ToString() }
+            : new ShellNavigationQueryParameters { ["id"] = id.ToString(), ["tab"] = tab });
 
     /// <summary>Opens a new product, optionally already linked to an art piece.</summary>
     public static Task OpenNewProductAsync(Guid? pieceId) =>

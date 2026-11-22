@@ -125,6 +125,23 @@ public sealed class ProductCatalog
         }
     }
 
+    /// <summary>
+    /// The product pictures that show any of these art pieces or projects (pass a project together with its pieces
+    /// to include those). In product order, then picture order.
+    /// </summary>
+    public IReadOnlyList<ProductPicture> ImagesFor(IReadOnlyCollection<Guid> pieceIds)
+    {
+        var result = new List<ProductPicture>();
+        foreach (var product in All)
+        {
+            if (ProductStore.FolderOf(product) is not { } folder) continue;
+            foreach (var image in product.Images)
+                if (image.PieceId is { } id && pieceIds.Contains(id))
+                    result.Add(new ProductPicture(product, image, Path.Combine(folder, image.FileName)));
+        }
+        return result;
+    }
+
     public bool ChangedOnDisk(Product product) => RootPath is not null && Store.ChangedOnDisk(product);
 
     /// <summary>The product's folder (with its pictures), or null when it was never saved.</summary>

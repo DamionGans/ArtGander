@@ -81,7 +81,7 @@ public sealed partial class BundleRow : ObservableObject
 /// The editor for one product. Edits are made on a copy and written on Save; a product changed on another computer
 /// (or by a sync) in the meantime is never overwritten without asking.
 /// </summary>
-public sealed partial class ProductDetailViewModel(AppState app, ThumbnailService thumbs, Core.Integrations.ProductCreator creator, IPlatformServices platform) : ObservableObject, IQueryAttributable
+public sealed partial class ProductDetailViewModel(AppState app, ThumbnailService thumbs, Core.Integrations.ProductCreator creator, IPlatformServices platform, ProtectionService protection) : ObservableObject, IQueryAttributable
 {
     public static IReadOnlyList<ProductType> ProductTypes { get; } = Enum.GetValues<ProductType>();
     public static IReadOnlyList<ProductStatus> ProductStatuses { get; } = Enum.GetValues<ProductStatus>();
@@ -145,6 +145,8 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
         OnPropertyChanged(nameof(IsPrices));
         OnPropertyChanged(nameof(IsChannels));
         OnPropertyChanged(nameof(IsSales));
+        OnPropertyChanged(nameof(IsImages));
+        if (value == "images") RebuildImages(); // picks up pictures dropped into the folder meanwhile
     }
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
@@ -207,6 +209,7 @@ public sealed partial class ProductDetailViewModel(AppState app, ThumbnailServic
         OnPropertyChanged(nameof(CanFinishPublishing));
         OnPropertyChanged(nameof(CanCreateOnShopify));
         RebuildArtFiles();
+        RebuildImages();
     }
 
     private void RebuildArtFiles()

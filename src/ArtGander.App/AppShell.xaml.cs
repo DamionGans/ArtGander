@@ -177,6 +177,27 @@ public partial class AppShell
         {
             NavigateCommand.Execute("products"); await Task.Delay(1000);
             await ViewModels.ProductsViewModel.OpenProductAsync(product.Id); await Task.Delay(2000); Log("9 product open");
+            if (CurrentPage is ProductDetailPage pd && app.AllFolders.FirstOrDefault(f => f.Document is not null && f.PreviewFilePath is not null) is { } withImage)
+            {
+                var vm = pd.ViewModel;
+                vm.Tab = "images"; await Task.Delay(500);
+                var before = vm.Images.Count;
+                await vm.AddImagePathsAsync([withImage.PreviewFilePath!]); await Task.Delay(1500);
+                var row = vm.Images.LastOrDefault();
+                if (row is not null)
+                {
+                    row.SelectedPiece = row.PieceChoices.FirstOrDefault(c => c.Id == withImage.Document!.Piece.Id);
+                    await vm.TrySaveAsync(); await Task.Delay(1000);
+                }
+                Log($"9a picture added: {before}->{vm.Images.Count} file={vm.Images.LastOrDefault()?.Image.FileName} folder={vm.FolderText} dirty={vm.HasUnsavedChanges}");
+                await GoToAsync(".."); await Task.Delay(1000);
+                NavigateCommand.Execute("library"); await Task.Delay(1000);
+                await ViewModels.LibraryViewModel.OpenPieceAsync(withImage.FolderPath, "products"); await Task.Delay(2000);
+                if (CurrentPage is PieceDetailPage pc) Log($"9b piece shows product pictures: {string.Join("|", pc.ViewModel.ProductPictures.Select(p => p.ProductName + ":" + p.Caption))}");
+                await GoToAsync(".."); await Task.Delay(1000);
+                NavigateCommand.Execute("products"); await Task.Delay(1000);
+                await ViewModels.ProductsViewModel.OpenProductAsync(product.Id); await Task.Delay(1500);
+            }
             await GoToAsync(".."); await Task.Delay(1000); Log("10 back from product");
         }
     }
