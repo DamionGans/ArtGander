@@ -161,6 +161,7 @@ public sealed class ShopifyClient(ApiHttp http, ShopifyAuth auth, string apiVers
     private const string ProductFields = """
         id handle title descriptionHtml tags status updatedAt onlineStoreUrl
         featuredMedia { preview { image { url } } }
+        media(first: 100) { nodes { id alt mediaContentType ... on MediaImage { image { url } } } }
         variants(first: 100) { nodes { id title sku price inventoryQuantity inventoryItem { id } } }
         """;
 
@@ -276,6 +277,131 @@ public sealed class ShopifyClient(ApiHttp http, ShopifyAuth auth, string apiVers
         return id;
     }
 
+    // ---- Pictures (media) ----------------------------------------------------------------------------
+
+    /// <summary>
+    /// Uploads pictures and adds them to the end of the product's media, in order. Returns the new media ids.
+    /// Files are sent to Shopify's staged upload storage first, then attached with <c>productUpdate</c>.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> AddMediaAsync(string productId, IReadOnlyList<(string Path, string Alt)> pictures, CancellationToken ct = default)
+    {
+        if (pictures.Count == 0) return [];
+        var staged = await GraphQLAsync("""
+            mutation($input: [StagedUploadInput!]!) { stagedUploadsCreate(input: $input) {
+              stagedTargets { url resourceUrl parameters { name value } } userErrors { field message } } }
+            """, new JsonObject
+        {
+            ["input"] = new JsonArray(pictures.Select(p => (JsonNode)new JsonObject
+            {
+                ["filename"] = System.IO.Path.GetFileName(p.Path),
+                ["mimeType"] = MimeType(p.Path),
+                ["resource"] = "IMAGE",
+                ["httpMethod"] = "POST",
+                ["fileSize"] = new FileInfo(p.Path).Length.ToString(CultureInfo.InvariantCulture),
+            }).ToArray()),
+        }, ct);
+        ThrowOnUserErrors(staged["stagedUploadsCreate"]);
+        var targets = staged["stagedUploadsCreate"].Arr("stagedTargets").ToList();
+        if (targets.Count != pictures.Count) throw new ShopifyException("Shopify didn't prepare an upload for every picture.");
+
+        var sources = new List<string>();
+        for (var i = 0; i < pictures.Count; i++)
+        {
+            var target = targets[i];
+            var path = pictures[i].Path;
+            await http.SendAsync(() =>
+            {
+                var form = new MultipartFormDataContent();
+                foreach (var prm in target.Arr("parameters"))
+                    form.Add(new StringContent(prm.Str("value")), prm.Str("name"));
+                var file = new ByteArrayContent(File.ReadAllBytes(path));
+                file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(MimeType(path));
+                form.Add(file, "file", System.IO.Path.GetFileName(path));
+                return new HttpRequestMessage(HttpMethod.Post, target.Str("url")) { Content = form };
+            }, ct);
+            sources.Add(target.Str("resourceUrl"));
+        }
+
+        var data = await GraphQLAsync("""
+            mutation($product: ProductUpdateInput!, $media: [CreateMediaInput!], $count: Int!) {
+              productUpdate(product: $product, media: $media) {
+                product { media(last: $count) { nodes { id } } } userErrors { field message } } }
+            """, new JsonObject
+        {
+            ["product"] = new JsonObject { ["id"] = Ids.ShopifyProductGid(productId) },
+            ["media"] = new JsonArray(pictures.Select((p, i) => (JsonNode)new JsonObject
+            {
+                ["originalSource"] = sources[i],
+                ["alt"] = p.Alt,
+                ["mediaContentType"] = "IMAGE",
+            }).ToArray()),
+            ["count"] = pictures.Count,
+        }, ct);
+        ThrowOnUserErrors(data["productUpdate"]);
+        return data["productUpdate"]?["product"]?["media"].Arr("nodes").Select(n => n.Str("id")).ToList() ?? [];
+    }
+
+    /// <summary>Changes the alt text of pictures.</summary>
+    public async Task UpdateMediaAltAsync(IReadOnlyList<(string MediaId, string Alt)> changes, CancellationToken ct = default)
+    {
+        if (changes.Count == 0) return;
+        var data = await GraphQLAsync("""
+            mutation($files: [FileUpdateInput!]!) { fileUpdate(files: $files) { userErrors { field message } } }
+            """, new JsonObject
+        {
+            ["files"] = new JsonArray(changes.Select(c => (JsonNode)new JsonObject { ["id"] = c.MediaId, ["alt"] = c.Alt }).ToArray()),
+        }, ct);
+        ThrowOnUserErrors(data["fileUpdate"]);
+    }
+
+    /// <summary>Takes pictures off the product (the files stay in the store's Files).</summary>
+    public async Task RemoveMediaAsync(string productId, IReadOnlyList<string> mediaIds, CancellationToken ct = default)
+    {
+        if (mediaIds.Count == 0) return;
+        var gid = Ids.ShopifyProductGid(productId);
+        var data = await GraphQLAsync("""
+            mutation($files: [FileUpdateInput!]!) { fileUpdate(files: $files) { userErrors { field message } } }
+            """, new JsonObject
+        {
+            ["files"] = new JsonArray(mediaIds.Select(id => (JsonNode)new JsonObject
+            {
+                ["id"] = id,
+                ["referencesToRemove"] = new JsonArray((JsonNode)gid),
+            }).ToArray()),
+        }, ct);
+        ThrowOnUserErrors(data["fileUpdate"]);
+    }
+
+    /// <summary>Puts the product's pictures in this order (Shopify does it in the background).</summary>
+    public async Task ReorderMediaAsync(string productId, IReadOnlyList<string> orderedMediaIds, CancellationToken ct = default)
+    {
+        if (orderedMediaIds.Count < 2) return;
+        var data = await GraphQLAsync("""
+            mutation($id: ID!, $moves: [MoveInput!]!) { productReorderMedia(id: $id, moves: $moves) { userErrors { field message } } }
+            """, new JsonObject
+        {
+            ["id"] = Ids.ShopifyProductGid(productId),
+            ["moves"] = new JsonArray(orderedMediaIds.Select((id, i) => (JsonNode)new JsonObject
+            {
+                ["id"] = id,
+                ["newPosition"] = i.ToString(CultureInfo.InvariantCulture),
+            }).ToArray()),
+        }, ct);
+        ThrowOnUserErrors(data["productReorderMedia"]);
+    }
+
+    private static string MimeType(string path) => System.IO.Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".png" => "image/png",
+        ".webp" => "image/webp",
+        ".gif" => "image/gif",
+        ".heic" => "image/heic",
+        ".avif" => "image/avif",
+        ".tif" or ".tiff" => "image/tiff",
+        ".bmp" => "image/bmp",
+        _ => "image/jpeg",
+    };
+
     /// <summary>The store's first location, used for stock of products you make yourselves.</summary>
     public async Task<string?> GetPrimaryLocationIdAsync(CancellationToken ct = default) =>
         (await GraphQLAsync("{ locations(first: 1) { nodes { id } } }", ct: ct))["locations"].Arr("nodes").FirstOrDefault().Str("id") is { Length: > 0 } id ? id : null;
@@ -360,6 +486,8 @@ public sealed class ShopifyClient(ApiHttp http, ShopifyAuth auth, string apiVers
         UpdatedAt = p.Str("updatedAt"),
         Url = p.Str("onlineStoreUrl"),
         ImageUrl = p["featuredMedia"]?["preview"]?["image"].Str("url") is { Length: > 0 } u ? u : null,
+        Images = p["media"].Arr("nodes").Where(m => m.Str("mediaContentType") == "IMAGE")
+            .Select(m => new RemoteImage(m.Str("id"), m["image"].Str("url"), m.Str("alt"))).ToList(),
         Variants = p["variants"].Arr("nodes").Select(v => new RemoteVariant
         {
             Id = v.Str("id"),

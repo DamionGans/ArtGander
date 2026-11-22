@@ -180,6 +180,7 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
                     var to = Path.Combine(oldFolder, newName);
                     if (!File.Exists(from) || from == to) continue;
                     MoveSafe(from, to);
+                    ProtectedCopies.FollowRename(from, to);
                     done.Add((from, to, entry, entry.FileName));
                     ReplaceFileReferences(doc.Piece.Id, entry.FileName, newName);
                     entry.FileName = newName;
@@ -196,6 +197,7 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
                 // "Tidy up product folders" offers the move later.
                 try { catalog?.RenameGroup(oldFolderName, newFolderName); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+                RenamePhotographs(doc.FolderPath, oldFolderName, newFolderName);
             }
         }
         catch
@@ -209,12 +211,33 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
             for (var i = done.Count - 1; i >= 0; i--)
             {
                 var (from, to, entry, oldName) = done[i];
-                try { MoveSafe(to, from); } catch (IOException) { }
+                try { MoveSafe(to, from); ProtectedCopies.FollowRename(to, from); } catch (IOException) { }
                 ReplaceFileReferences(doc.Piece.Id, entry.FileName, oldName);
                 entry.FileName = oldName;
             }
             doc.Piece.Title = oldTitle;
             throw;
+        }
+    }
+
+    /// <summary>
+    /// The photographs in the piece's Photograph folder follow a new piece name ({Art_Piece_Name}-photograph.{ext}),
+    /// and so do their protected copies. Best effort: a file that can't be renamed keeps its name.
+    /// </summary>
+    public static void RenamePhotographs(string pieceFolder, string oldFolderName, string newFolderName)
+    {
+        foreach (var photo in ProtectedCopies.Photographs(pieceFolder))
+        {
+            var name = Path.GetFileName(photo);
+            if (!FileNamer.TryParseVersion(oldFolderName, name, out var version)) continue;
+            var renamed = Path.Combine(Path.GetDirectoryName(photo)!, FileNamer.Build(newFolderName, version, Path.GetExtension(name)));
+            if (renamed == photo || (File.Exists(renamed) && !NameRules.NamesEqual(renamed, photo))) continue;
+            try
+            {
+                MoveSafe(photo, renamed);
+                ProtectedCopies.FollowRename(photo, renamed);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
     }
 
@@ -239,7 +262,11 @@ public sealed partial class PieceService(ArtPieceStore store, ProductCatalog? ca
         var newName = FileNamer.Build(doc.FolderName, label, ext);
 
         var from = doc.GetFilePath(entry.FileName);
-        if (File.Exists(from)) MoveSafe(from, doc.GetFilePath(newName));
+        if (File.Exists(from))
+        {
+            MoveSafe(from, doc.GetFilePath(newName));
+            ProtectedCopies.FollowRename(from, doc.GetFilePath(newName));
+        }
         ReplaceFileReferences(doc.Piece.Id, entry.FileName, newName);
         entry.FileName = newName;
         entry.Version = label;

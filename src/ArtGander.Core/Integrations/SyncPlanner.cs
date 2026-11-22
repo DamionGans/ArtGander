@@ -103,6 +103,10 @@ public static class SyncPlanner
                 CompareChannel(plan, s, baseSnap, owner: true, includeStatus: true, includeStock: true, includeEnabled: false,
                     review: product.Channels.Shopify.NeedsReview);
             }
+            // "Our own pictures": ArtGander owns the Shopify pictures (Printify publishes without pictures then).
+            if (product.EffectivePictures == PictureMode.Own
+                && ShopPictures.Compare(product, s, baseSnap?.Pictures, product.Channels.Shopify.NeedsReview) is { } pictures)
+                plan.Changes.Add(pictures);
         }
     }
 

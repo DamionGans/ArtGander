@@ -106,7 +106,11 @@ public static class ProductImageService
                 (File.Exists(Path.Combine(folder, n)) && !NameRules.NamesEqual(n, image.FileName)) || (Find(product, n) is { } other && other != image));
         var fileName = FileNamer.Build(name, label, ext);
         var from = Path.Combine(folder, image.FileName);
-        if (File.Exists(from)) PieceService.MoveSafe(from, Path.Combine(folder, fileName));
+        if (File.Exists(from))
+        {
+            PieceService.MoveSafe(from, Path.Combine(folder, fileName));
+            ProtectedCopies.FollowRename(from, Path.Combine(folder, fileName));
+        }
         image.FileName = fileName;
         image.Label = label;
     }

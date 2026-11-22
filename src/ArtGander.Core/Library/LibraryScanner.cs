@@ -89,6 +89,8 @@ public sealed class LibraryScanner(ArtPieceStore store)
                 continue;
             if (productsFolder is not null && NameRules.NamesEqual(name, productsFolder))
                 continue;
+            if (Services.ProtectedCopies.IsSpecialFolder(dir)) // protected copies or the photographs, not an art piece
+                continue;
             yield return dir;
         }
     }

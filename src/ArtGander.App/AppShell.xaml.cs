@@ -168,7 +168,7 @@ public partial class AppShell
                     for (var i = 0; i < 240 && !(vm.Files.FirstOrDefault(f => f.Entry.FileName == name) is { IsProtecting: false, ProtectMessage.Length: > 0 }); i++)
                         await Task.Delay(500);
                     var done = vm.Files.FirstOrDefault(f => f.Entry.FileName == name);
-                    Log($"8b quick protect: {done?.ProtectMessage} files={string.Join("|", vm.Files.Select(f => $"{f.Entry.FileName}:{f.Entry.Kind}"))}");
+                    Log($"8b quick protect: {done?.ProtectMessage} copy={done?.ProtectedCopyText} files={vm.Files.Count} photographs={string.Join("|", vm.Photographs.Select(p => p.FileName + ":" + p.ProtectButtonText))}");
                 }
             }
             await GoToAsync(".."); await Task.Delay(1000);

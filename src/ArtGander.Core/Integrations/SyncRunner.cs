@@ -21,6 +21,10 @@ public interface IShopifyApi
         IReadOnlyList<RemoteVariant>? variantPrices, CancellationToken ct = default);
     Task SetStockAsync(string locationId, IReadOnlyList<(string InventoryItemId, int Quantity, int? ExpectedCurrent)> items, CancellationToken ct = default);
     Task<string?> GetPrimaryLocationIdAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<string>> AddMediaAsync(string productId, IReadOnlyList<(string Path, string Alt)> pictures, CancellationToken ct = default);
+    Task UpdateMediaAltAsync(IReadOnlyList<(string MediaId, string Alt)> changes, CancellationToken ct = default);
+    Task RemoveMediaAsync(string productId, IReadOnlyList<string> mediaIds, CancellationToken ct = default);
+    Task ReorderMediaAsync(string productId, IReadOnlyList<string> orderedMediaIds, CancellationToken ct = default);
 }
 
 public sealed record SyncOutcome(Product Product, bool Done, string Message);
@@ -31,7 +35,7 @@ public sealed record SyncOutcome(Product Product, bool Done, string Message);
 /// Afterwards it records the new agreed values (the base); fields you chose to skip keep their old base, so they are
 /// shown again next time instead of being decided silently.
 /// </summary>
-public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, IShopifyApi? shopify)
+public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, IShopifyApi? shopify, PictureDownloader? download = null)
 {
     private static readonly HashSet<string> TextFields = ["title", "description", "tags"];
 
@@ -86,15 +90,22 @@ public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, I
         // 3. Apply your choices: take over shop values into ArtGander, collect what to push.
         var push = new HashSet<(string Field, string? Variant)>();
         var skipped = new List<SyncFieldChange>();
+        var pictures = SyncResolution.Skip;
         foreach (var change in plan.Changes)
         {
             var choice = choices.TryGetValue(ChoiceKey(product, change), out var r) ? r : change.DefaultResolution;
+            if (change.Field == "pictures")
+            {
+                pictures = choice;
+                if (choice == SyncResolution.Skip) skipped.Add(change);
+                continue;
+            }
             switch (choice)
             {
                 case SyncResolution.TakeRemote:
                     SetLocal(product, change.Field, change.VariantKey, change.Remote);
                     // Taken over from Shopify on a Printify product: Printify must get it too, or its next publish undoes it.
-                    if (change.Channel == "shopify" && p is not null && change.Field is not ("status" or "stock")) push.Add((change.Field, change.VariantKey));
+                    if (change.Channel == "shopify" && p is not null && change.Field is not ("status" or "stock" or "pictures")) push.Add((change.Field, change.VariantKey));
                     break;
                 case SyncResolution.Push:
                     push.Add((change.Field, change.VariantKey));
@@ -107,6 +118,7 @@ public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, I
 
         // 4. Write to the owner of each field.
         var published = false;
+        List<string>? picturesBase = null;
         if (p is not null && pLink is not null)
         {
             var texts = push.Where(x => TextFields.Contains(x.Field)).Select(x => x.Field).ToHashSet();
@@ -151,6 +163,14 @@ public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, I
                 if (sLink.InventoryLocationId is null) return new SyncOutcome(product, false, "Shopify has no location for stock.");
                 await shopify!.SetStockAsync(sLink.InventoryLocationId, stock, ct);
             }
+
+            if (pictures == SyncResolution.Push)
+                picturesBase = await ShopPictures.PushAsync(product, sLink.ProductId, s, sLink.Base?.Pictures, shopify!, ct);
+            else if (pictures == SyncResolution.TakeRemote)
+            {
+                if (download is null) return new SyncOutcome(product, false, "Can't download pictures here.");
+                picturesBase = await ShopPictures.TakeOverAsync(product, s, download, ct);
+            }
         }
 
         // 5. Record the new agreed values; skipped fields keep their old base so they come back next time.
@@ -178,6 +198,8 @@ public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, I
                     SetBase(sLink.Base, field, variant, LocalValue(product, field, variant));
             }
             KeepSkipped(sLink.Base, old, skipped.Where(c => c.Channel == "shopify"));
+            // Shopify sorts and processes new pictures in the background: expect what was sent, not what it shows yet.
+            sLink.Base.Pictures = picturesBase ?? (pictures == SyncResolution.Skip ? old?.Pictures : sLink.Base.Pictures);
             sLink.RemoteUpdatedAt = fresh.UpdatedAt;
             sLink.LastSyncedAt = now;
             sLink.Handle = fresh.Handle;
@@ -186,7 +208,7 @@ public sealed class SyncRunner(ProductCatalog catalog, IPrintifyApi? printify, I
         }
 
         catalog.Save(product);
-        var sent = push.Count;
+        var sent = push.Count + (pictures == SyncResolution.Push ? 1 : 0);
         var taken = plan.Changes.Count - sent - skipped.Count;
         return new SyncOutcome(product, true, string.Join(", ", new[]
         {

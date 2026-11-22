@@ -15,6 +15,12 @@ public sealed partial class FileRowViewModel(FileEntry entry, string fullPath, b
     public bool IsMisnamed { get; } = misnamed;
     public bool IsOk => !IsMissing && !IsMisnamed;
 
+    /// <summary>For a missing file: the special folder it was moved into (Photograph or Protected), if found there.</summary>
+    public string? MovedTo { get; init; }
+    public string MissingText => MovedTo is { } where
+        ? $"Moved into the {where} folder, where ArtGander shows it now. Remove it from this list."
+        : "⚠ Missing on disk: moved, renamed or deleted outside ArtGander";
+
     /// <summary>The version label being edited. Applying it renames the file.</summary>
     [ObservableProperty] public partial string EditVersion { get; set; } = entry.Version;
     [ObservableProperty] public partial ImageSource? Thumbnail { get; set; }
@@ -44,6 +50,27 @@ public sealed partial class FileRowViewModel(FileEntry entry, string fullPath, b
     public async Task LoadThumbnailAsync(ThumbnailService thumbs)
     {
         if (IsMissing) return;
+        var path = await thumbs.GetAsync(FullPath);
+        if (path is not null) MainThread.BeginInvokeOnMainThread(() => Thumbnail = ImageSource.FromFile(path));
+    }
+}
+
+/// <summary>A picture in a special folder (the original photograph in Photograph/), shown with its protected copy.</summary>
+public sealed partial class SpecialFileRow : ProtectableRow
+{
+    public SpecialFileRow(string fullPath)
+    {
+        FullPath = fullPath;
+        RefreshProtectedCopy();
+    }
+
+    public override string FullPath { get; }
+    public override bool IsMissing => !File.Exists(FullPath);
+    public string FileName => Path.GetFileName(FullPath);
+    [ObservableProperty] public partial ImageSource? Thumbnail { get; set; }
+
+    public async Task LoadThumbnailAsync(ThumbnailService thumbs)
+    {
         var path = await thumbs.GetAsync(FullPath);
         if (path is not null) MainThread.BeginInvokeOnMainThread(() => Thumbnail = ImageSource.FromFile(path));
     }

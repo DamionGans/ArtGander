@@ -25,7 +25,7 @@ public static class FileKind
     public const string Protected = "protected";
     public const string Other = "other";
 
-    public static IReadOnlyList<string> Defaults { get; } = [Cover, Photo, Scan, Master, Edit, Transparent, Print, Mockup, Protected, Other];
+    public static IReadOnlyList<string> Defaults { get; } = [Cover, Photo, Scan, Master, Edit, Transparent, Print, Mockup, Other];
 }
 
 [JsonConverter(typeof(CamelCaseEnumConverter<ItemType>))]

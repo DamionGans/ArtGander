@@ -66,6 +66,43 @@ internal sealed class FakeShopify : IShopifyApi
     }
 
     public Task<string?> GetPrimaryLocationIdAsync(CancellationToken ct = default) => Task.FromResult<string?>("gid://shopify/Location/1");
+
+    private int _media = 100;
+
+    public Task<IReadOnlyList<string>> AddMediaAsync(string productId, IReadOnlyList<(string Path, string Alt)> pictures, CancellationToken ct = default)
+    {
+        var ids = pictures.Select(_ => $"gid://shopify/MediaImage/{++_media}").ToList();
+        Calls.Add("upload " + string.Join(",", pictures.Select(p => Path.GetFileName(p.Path))));
+        Product = Product with { Images = [.. Product.Images, .. pictures.Select((p, i) => new RemoteImage(ids[i], "https://cdn.shopify.com/" + ids[i], p.Alt))] };
+        return Task.FromResult<IReadOnlyList<string>>(ids);
+    }
+
+    public Task UpdateMediaAltAsync(IReadOnlyList<(string MediaId, string Alt)> changes, CancellationToken ct = default)
+    {
+        if (changes.Count == 0) return Task.CompletedTask;
+        Calls.Add("alt " + string.Join(",", changes.Select(c => c.Alt)));
+        Product = Product with { Images = Product.Images.Select(m => changes.FirstOrDefault(c => c.MediaId == m.Id) is { MediaId: not null } c ? m with { Alt = c.Alt } : m).ToList() };
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveMediaAsync(string productId, IReadOnlyList<string> mediaIds, CancellationToken ct = default)
+    {
+        if (mediaIds.Count == 0) return Task.CompletedTask;
+        Calls.Add("remove " + string.Join(",", mediaIds));
+        Product = Product with { Images = Product.Images.Where(m => !mediaIds.Contains(m.Id)).ToList() };
+        return Task.CompletedTask;
+    }
+
+    public Task ReorderMediaAsync(string productId, IReadOnlyList<string> orderedMediaIds, CancellationToken ct = default)
+    {
+        if (orderedMediaIds.Count < 2) return Task.CompletedTask;
+        Calls.Add("reorder");
+        Product = Product with { Images = Product.Images.OrderBy(m => orderedMediaIds.ToList().IndexOf(m.Id)).ToList() };
+        return Task.CompletedTask;
+    }
+
+    /// <summary>A picture added by hand in the Shopify admin.</summary>
+    public void AddByHand(string id, string alt) => Product = Product with { Images = [.. Product.Images, new RemoteImage(id, "https://cdn.shopify.com/" + id, alt)] };
 }
 
 public class SyncTests

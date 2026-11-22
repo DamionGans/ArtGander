@@ -260,6 +260,7 @@ public static class ProductImporter
             Description = remote.Description,
             Tags = [.. remote.Tags],
             Status = remote.Status,
+            Pictures = remote.Channel == "shopify" ? ShopPictures.RemoteSignature(remote) : null,
         };
         foreach (var rv in remote.Variants)
         {

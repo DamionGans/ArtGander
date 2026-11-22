@@ -167,6 +167,7 @@ public sealed class ProductStore
             catch { UndoImages(product, renamedImages, oldFolder); throw; }
             folder = target;
             renamedFrom = oldFolder;
+            Services.PieceService.RenamePhotographs(target, ConventionName(Path.GetFileName(oldFolder)), ConventionName(Path.GetFileName(target)));
         }
         else if (oldFolder is not null && Directory.Exists(oldFolder) && Path.GetFileName(oldFolder) != wanted
                  && NameRules.NamesEqual(Path.GetFileName(oldFolder), wanted))
@@ -177,6 +178,7 @@ public sealed class ProductStore
             MoveDirectory(oldFolder, target);
             folder = target;
             renamedFrom = oldFolder;
+            Services.PieceService.RenamePhotographs(target, ConventionName(Path.GetFileName(oldFolder)), ConventionName(Path.GetFileName(target)));
         }
 
         try
@@ -314,6 +316,7 @@ public sealed class ProductStore
                 var from = Path.Combine(folder, image.FileName);
                 if (renamed == image.FileName || !File.Exists(from)) { image.FileName = renamed; continue; }
                 Services.PieceService.MoveSafe(from, Path.Combine(folder, renamed));
+                Services.ProtectedCopies.FollowRename(from, Path.Combine(folder, renamed));
                 done.Add((image.FileName, renamed));
                 image.FileName = renamed;
             }
@@ -331,7 +334,12 @@ public sealed class ProductStore
         for (var i = done.Count - 1; i >= 0; i--)
         {
             var (from, to) = done[i];
-            try { Services.PieceService.MoveSafe(Path.Combine(folder, to), Path.Combine(folder, from)); } catch (IOException) { }
+            try
+            {
+                Services.PieceService.MoveSafe(Path.Combine(folder, to), Path.Combine(folder, from));
+                Services.ProtectedCopies.FollowRename(Path.Combine(folder, to), Path.Combine(folder, from));
+            }
+            catch (IOException) { }
             if (product.Images.FirstOrDefault(im => im.FileName == to) is { } image) image.FileName = from;
         }
     }

@@ -173,6 +173,8 @@ public sealed class PrintifyClient(ApiHttp http, string token) : IPrintifyApi
         ExternalId = p?["external"] is JsonObject ext && ext.Str("id") is { Length: > 0 } eid ? eid : null,
         Handle = p?["external"].Str("handle") ?? "",
         ImageUrl = p.Arr("images").FirstOrDefault(i => i.Bool("is_default")).Str("src") is { Length: > 0 } src ? src : p.Arr("images").FirstOrDefault().Str("src"),
+        Images = p.Arr("images").Where(i => i.Str("src").Length > 0)
+            .Select(i => new RemoteImage(i.Str("src"), i.Str("src"), "", i.Bool("is_selected_for_publishing", true), i.Bool("is_default"))).ToList(),
         Variants = p.Arr("variants").Select(v => new RemoteVariant
         {
             Id = v.Str("id"),

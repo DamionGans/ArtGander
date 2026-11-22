@@ -24,6 +24,21 @@ public abstract partial class ProtectableRow : ObservableObject
     public bool HasProtectMessage => ProtectMessage.Length > 0 && !IsProtecting;
     public CancellationTokenSource? ProtectCancel { get; set; }
 
+    /// <summary>The protected copy in the Protected folder next to the file, or null.</summary>
+    [ObservableProperty] public partial string? ProtectedCopyPath { get; set; }
+    public bool HasProtectedCopy => ProtectedCopyPath is not null;
+    public string ProtectedCopyText => ProtectedCopyPath is { } p ? $"Protected copy: {Core.Services.ProtectedCopies.FolderName}/{Path.GetFileName(p)}" : "";
+    public string ProtectButtonText => HasProtectedCopy ? "Protect again" : "Protect";
+    partial void OnProtectedCopyPathChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasProtectedCopy));
+        OnPropertyChanged(nameof(ProtectedCopyText));
+        OnPropertyChanged(nameof(ProtectButtonText));
+    }
+
+    /// <summary>Looks for the protected copy on disk (also one saved from Mistcoat's own window).</summary>
+    public void RefreshProtectedCopy() => ProtectedCopyPath = CanProtect ? Core.Services.ProtectedCopies.Find(FullPath) : null;
+
     partial void OnAdvancedChanged(ProtectOptionsViewModel? value) => OnPropertyChanged(nameof(HasAdvanced));
     partial void OnIsProtectingChanged(bool value)
     {

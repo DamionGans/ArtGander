@@ -86,7 +86,7 @@
             <!-- Image protection: Mistcoat -->
             <VerticalStackLayout Spacing="4">
                 <Label Text="Image protection" Style="{StaticResource SectionTitle}" />
-                <Label Text="ArtGander uses Mistcoat to make copies of your images that are protected against AI training. Every image file of an art piece gets a Protect button (quick, with the preset below) and Options… (everything Mistcoat can do)."
+                <Label Text="ArtGander uses Mistcoat to make copies of your images that are protected against AI training. Every image of an art piece or product gets a Protect button (quick, with the preset below) and Options… (everything Mistcoat can do). The protected copy goes in the Protected folder next to it, as {name}-protected.{ext}."
                        Style="{StaticResource Muted}" />
                 <Label Text="Mistcoat program on this computer (empty = look in the usual places)" Style="{StaticResource FieldLabel}" />
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">

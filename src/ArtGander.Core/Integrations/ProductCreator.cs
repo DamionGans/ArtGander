@@ -144,6 +144,18 @@ public sealed class ProductCreator(Connections connections, ProductCatalog catal
             .ToList();
         if (location is not null && stock.Count > 0) await shopify.SetStockAsync(location, stock, ct);
 
+        // The product's own pictures go along straight away.
+        List<string>? pictures = null;
+        string picturesNote = "";
+        if (ShopPictures.ShopImages(product).Count > 0)
+        {
+            try { pictures = await ShopPictures.PushAsync(product, id, created, [], shopify, ct); }
+            catch (Exception ex) when (ex is ShopifyException or ApiException or HttpRequestException or IOException)
+            {
+                picturesNote = $" The pictures couldn't be uploaded ({ex.Message}); Sync tries again.";
+            }
+        }
+
         var fresh = await shopify.GetProductAsync(id, ct) ?? created;
         var link = product.Channels.Shopify;
         link.Handle = fresh.Handle;
@@ -151,8 +163,10 @@ public sealed class ProductCreator(Connections connections, ProductCatalog catal
         link.InventoryLocationId = location;
         link.RemoteUpdatedAt = fresh.UpdatedAt;
         link.Base = ProductImporter.Snapshot(fresh, product);
+        link.Base.Pictures = pictures ?? [];
         catalog.Save(product);
-        return "Created in Shopify as a draft. Set the product to Active in ArtGander and sync to put it on sale (or add images in Shopify first).";
+        return "Created in Shopify as a draft" + (pictures is { Count: > 0 } ? $" with {pictures.Count} picture(s)" : "")
+            + ". Set the product to Active in ArtGander and sync to put it on sale." + picturesNote;
     }
 
     /// <summary>Takes over the enabled Printify variants as the product's variants (keeping prices you already set).</summary>

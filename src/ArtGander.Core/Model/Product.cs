@@ -154,6 +154,9 @@ public sealed class ShopifyMediaLink
     public string Hash { get; set; } = "";
     /// <summary>Uploaded by ArtGander (only those may ever be removed from Shopify by ArtGander).</summary>
     public bool UploadedByArtGander { get; set; }
+    /// <summary>The file's size and time when <see cref="Hash"/> was taken, so unchanged files aren't read again.</summary>
+    public long Size { get; set; }
+    public DateTimeOffset? Modified { get; set; }
     public string Alt { get; set; } = "";
 }
 
@@ -247,6 +250,8 @@ public sealed class SyncSnapshot : ModelBase
     public List<string>? Tags { get; set; }
     public string? Status { get; set; }
     public List<VariantSnapshot> Variants { get; set; } = [];
+    /// <summary>Shopify: the product's pictures in order, as "mediaId|alt" (null: never compared).</summary>
+    public List<string>? Pictures { get; set; }
 }
 
 public sealed class VariantSnapshot : ModelBase

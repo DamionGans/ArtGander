@@ -1,47 +1,99 @@
 using ArtGander.App.Services;
 using ArtGander.Core.Integrations;
-using ArtGander.Core.Model;
+using ArtGander.Core.Services;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ArtGander.App.ViewModels;
 
-/// <summary>Protecting a piece's images against AI training with Mistcoat. The protected copy becomes a new file of the piece.</summary>
+/// <summary>
+/// Protecting a piece's images against AI training with Mistcoat. The protected copy goes in the Protected folder
+/// of the piece (<c>Protected/{name}-protected.{ext}</c>); the original stays as it is. This works for the tracked files
+/// and for the original photographs in the Photograph folder.
+/// </summary>
 public sealed partial class PieceDetailViewModel
 {
     /// <summary>The row currently shown for a file. Rows are rebuilt after file operations, so a running protection looks it up again.</summary>
     private FileRowViewModel? RowFor(string fileName) =>
         Files.FirstOrDefault(r => string.Equals(r.Entry.FileName, fileName, StringComparison.OrdinalIgnoreCase));
 
-    private static void CarryOver(FileRowViewModel? from, FileRowViewModel to) => to.CarryOverFrom(from);
+    /// <summary>The row currently shown for the same file as <paramref name="row"/> (a tracked file or a photograph).</summary>
+    private ProtectableRow? RowNow(ProtectableRow row) => row is FileRowViewModel f
+        ? RowFor(f.Entry.FileName)
+        : Photographs.FirstOrDefault(p => string.Equals(p.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase));
 
-    [RelayCommand]
-    private void QuickProtect(FileRowViewModel? row) => Ui.Fire(() =>
-        row is null || Doc is null ? Task.CompletedTask
-            : ProtectAsync(row, protection.QuickOptions(Doc.Piece), Path.GetExtension(row.FullPath), ProtectionService.ProtectedVersion(row.Entry.Version)));
-
-    [RelayCommand]
-    private void ShowProtectOptions(FileRowViewModel? row)
+    private static void CarryOver(FileRowViewModel? from, FileRowViewModel to)
     {
-        if (row is null || Doc is null) return;
-        row.Advanced = row.Advanced is null
-            ? new ProtectOptionsViewModel(Path.GetExtension(row.FullPath), protection.QuickOptions(Doc.Piece), ProtectionService.ProtectedVersion(row.Entry.Version))
-            : null;
+        to.CarryOverFrom(from);
+        to.RefreshProtectedCopy();
     }
 
     [RelayCommand]
-    private void ProtectWithOptions(FileRowViewModel? row) => Ui.Fire(() =>
+    private void QuickProtect(ProtectableRow? row) => Ui.Fire(() =>
+        row is null || Doc is null ? Task.CompletedTask
+            : ProtectRowAsync(protection, row, () => RowNow(row), protection.QuickOptions(Doc.Piece), Path.GetExtension(row.FullPath)));
+
+    [RelayCommand]
+    private void ShowProtectOptions(ProtectableRow? row)
     {
-        if (row?.Advanced is not { } options) return Task.CompletedTask;
-        var version = string.IsNullOrWhiteSpace(options.Version) ? ProtectionService.ProtectedVersion(row.Entry.Version) : options.Version;
-        return ProtectAsync(row, options.ToOptions(), options.OutputExtension, version);
-    });
+        if (row is null || Doc is null) return;
+        row.Advanced = row.Advanced is null ? new ProtectOptionsViewModel(Path.GetExtension(row.FullPath), protection.QuickOptions(Doc.Piece), "") : null;
+    }
 
     [RelayCommand]
-    private void CancelProtect(FileRowViewModel? row) => row?.ProtectCancel?.Cancel();
+    private void ProtectWithOptions(ProtectableRow? row) => Ui.Fire(() =>
+        row?.Advanced is not { } options ? Task.CompletedTask
+            : ProtectRowAsync(protection, row, () => RowNow(row), options.ToOptions(), options.OutputExtension));
 
-    /// <summary>Opens Mistcoat's own window with this image, to check the preview there and save it from Mistcoat.</summary>
     [RelayCommand]
-    private void OpenInMistcoat(FileRowViewModel? row) => Ui.Fire(() => row is null ? Task.CompletedTask : OpenInMistcoatAsync(protection, row));
+    private void CancelProtect(ProtectableRow? row) => row?.ProtectCancel?.Cancel();
+
+    [RelayCommand]
+    private void OpenInMistcoat(ProtectableRow? row) => Ui.Fire(() => row is null ? Task.CompletedTask : OpenInMistcoatAsync(protection, row));
+
+    [RelayCommand]
+    private void OpenProtectedCopy(ProtectableRow? row) => Ui.Fire(() => OpenProtectedCopyAsync(row));
+
+    [RelayCommand]
+    private void ShowProtectedCopy(ProtectableRow? row) => ShowProtectedCopy(platform, row);
+
+    [RelayCommand]
+    private void OpenPhotograph(SpecialFileRow? row) => Ui.Fire(() => OpenFilePathAsync(row?.FullPath));
+
+    [RelayCommand]
+    private void ShowPhotograph(SpecialFileRow? row)
+    {
+        if (row is not null && File.Exists(row.FullPath)) platform.RevealInFileManager(row.FullPath);
+    }
+
+    // ---- Shared with the product page ----
+
+    public static async Task OpenFilePathAsync(string? path)
+    {
+        if (path is null || !File.Exists(path)) return;
+        try { await Launcher.Default.OpenAsync(new OpenFileRequest(Path.GetFileName(path), new ReadOnlyFile(path))); }
+        catch (Exception ex) { await Dialogs.ErrorAsync(ex); }
+    }
+
+    /// <summary>Protects the row's image into its Protected folder, replacing an earlier protected copy of it.</summary>
+    public static Task ProtectRowAsync(ProtectionService protection, ProtectableRow row, Func<ProtectableRow?> rowNow, MistcoatOptions options, string extension)
+    {
+        var source = row.FullPath;
+        return protection.RunAsync(row, rowNow, options, extension, (output, result) =>
+        {
+            var target = ProtectedCopies.PathFor(source, extension);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            // Earlier protected copies of this file (another format, or Mistcoat's "_protected" name) are replaced by the new one.
+            foreach (var earlier in ProtectedCopies.FindAll(source))
+                if (!string.Equals(earlier, target, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(Path.GetFileName(earlier), Path.GetFileName(source), StringComparison.OrdinalIgnoreCase))
+                    File.Delete(earlier);
+            File.Move(output, target, overwrite: true);
+            var current = rowNow() ?? row;
+            current.Advanced = null;
+            current.RefreshProtectedCopy();
+            return Task.FromResult(ProtectionService.SavedMessage($"{ProtectedCopies.FolderName}/{Path.GetFileName(target)}", result));
+        });
+    }
 
     /// <summary>Opens Mistcoat's window with the row's image (shared by the piece and product pages).</summary>
     public static async Task OpenInMistcoatAsync(ProtectionService protection, ProtectableRow row)
@@ -54,24 +106,18 @@ public sealed partial class PieceDetailViewModel
         }
         try { runner.OpenWindow([row.FullPath]); }
         catch (Exception ex) { await Dialogs.ErrorAsync(ex); return; }
-        row.ProtectMessage = "Opened in Mistcoat. It saves into a \"Protected\" folder next to the file; add the result here with Add… (or drop it on this page).";
+        row.ProtectMessage = "Opened in Mistcoat. What you save there goes in the Protected folder next to the file; ArtGander shows it here (come back to this page to see it).";
     }
 
-    private Task ProtectAsync(FileRowViewModel row, MistcoatOptions options, string extension, string version)
+    public static async Task OpenProtectedCopyAsync(ProtectableRow? row)
     {
-        if (Doc is not { IsReadOnly: false } doc) return Task.CompletedTask;
-        var fileName = row.Entry.FileName;
-        return protection.RunAsync(row, () => RowFor(fileName), options, extension, async (output, result) =>
-        {
-            var notes = ProtectionService.NotesFor(options, fileName);
-            FileEntry? added = null;
-            if (ReferenceEquals(Doc, doc))
-                await FileOpAsync(() => added = pieces.ImportFile(doc, output, version, FileKind.Protected, move: true, notes: notes));
-            else
-                using (app.SuspendWatching()) added = pieces.ImportFile(doc, output, version, FileKind.Protected, move: true, notes: notes);
-            if (added is null) return "Mistcoat finished, but the protected copy couldn't be added to this piece.";
-            if (RowFor(fileName) is { } r) r.Advanced = null;
-            return ProtectionService.SavedMessage(added.FileName, result);
-        });
+        if (row?.ProtectedCopyPath is not { } path || !File.Exists(path)) return;
+        try { await Launcher.Default.OpenAsync(new OpenFileRequest(Path.GetFileName(path), new ReadOnlyFile(path))); }
+        catch (Exception ex) { await Dialogs.ErrorAsync(ex); }
+    }
+
+    public static void ShowProtectedCopy(IPlatformServices platform, ProtectableRow? row)
+    {
+        if (row?.ProtectedCopyPath is { } path && File.Exists(path)) platform.RevealInFileManager(path);
     }
 }

@@ -143,6 +143,8 @@ public sealed class PieceFolder
                     .OrderBy(f => FileNamer.IsCoverName(FolderName, f) ? 0 : 1).ToList();
             var first = images.FirstOrDefault();
             if (first is not null) return Path.Combine(FolderPath, first);
+            // No art file: the original photograph, if there is one.
+            if (Document is not null && Services.ProtectedCopies.Photographs(FolderPath).FirstOrDefault() is { } photo) return photo;
             return Children.Select(c => c.PreviewFilePath).FirstOrDefault(p => p is not null);
         }
     }

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Protection against AI training (Mistcoat) for one image: Protect, Options…, progress, the protected copy. -->
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ArtGander.App.ViewModels"
+             xmlns:views="clr-namespace:ArtGander.App.Views"
+             x:Class="ArtGander.App.Views.ProtectControls"
+             x:Name="Self"
+             x:DataType="vm:ProtectableRow">
+    <VerticalStackLayout Spacing="4" IsVisible="{Binding CanProtect}">
+        <FlexLayout Wrap="Wrap" AlignItems="Center">
+            <Label Text="Protect against AI training" Style="{StaticResource Muted}" VerticalOptions="Center" Margin="0,0,6,4" />
+            <Button Text="{Binding ProtectButtonText}" IsEnabled="{Binding CanStartProtect}" Margin="0,0,6,4"
+                    ToolTipProperties.Text="Make a protected copy with Mistcoat (the preset from Settings), in the Protected folder"
+                    Command="{Binding QuickProtectCommand, Source={x:Reference Self}, x:DataType=views:ProtectControls}" CommandParameter="{Binding .}" />
+            <Button Text="Options…" IsEnabled="{Binding CanStartProtect}" Margin="0,0,6,4"
+                    ToolTipProperties.Text="Choose the strength, techniques, format and embedded credit"
+                    Command="{Binding ShowOptionsCommand, Source={x:Reference Self}, x:DataType=views:ProtectControls}" CommandParameter="{Binding .}" />
+        </FlexLayout>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding HasProtectedCopy}">
+            <Label Text="{Binding ProtectedCopyText}" VerticalOptions="Center" LineBreakMode="MiddleTruncation" FontSize="13" />
+            <HorizontalStackLayout Grid.Column="1" Spacing="4">
+                <Button Text="Open" Command="{Binding OpenCopyCommand, Source={x:Reference Self}, x:DataType=views:ProtectControls}" CommandParameter="{Binding .}" />
+                <Button Text="Show" Command="{Binding ShowCopyCommand, Source={x:Reference Self}, x:DataType=views:ProtectControls}" CommandParameter="{Binding .}" />
+            </HorizontalStackLayout>
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding IsProtecting}">
+            <VerticalStackLayout>
+                <ProgressBar Progress="{Binding ProtectFraction}" />
+                <Label Text="{Binding ProtectStage}" Style="{StaticResource Muted}" FontSize="12" LineBreakMode="TailTruncation" />
+            </VerticalStackLayout>
+            <Button Grid.Column="1" Text="Cancel" Command="{Binding CancelCommand, Source={x:Reference Self}, x:DataType=views:ProtectControls}" CommandParameter="{Binding .}" />
+        </Grid>
+        <Label Text="{Binding ProtectMessage}" IsVisible="{Binding HasProtectMessage}" Style="{StaticResource Muted}" FontSize="12" />
+
+        <ContentView IsVisible="{Binding HasAdvanced}">
+            <Border Style="{StaticResource Banner}" BindingContext="{Binding Advanced}" x:DataType="vm:ProtectOptionsViewModel" Padding="10">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Preset" Style="{StaticResource FieldLabel}" Margin="0" />
+                    <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.Presets}" SelectedItem="{Binding Preset}" MaximumWidthRequest="260" HorizontalOptions="Start"
+                            ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                    <Label Text="{Binding PresetBlurb}" Style="{StaticResource Muted}" FontSize="12" />
+                    <Label Text="{Binding StrengthText, StringFormat='Strength: {0} of 100'}" Style="{StaticResource FieldLabel}" Margin="0" />
+                    <Slider Minimum="0" Maximum="100" Value="{Binding Strength}" MaximumWidthRequest="420" HorizontalOptions="Fill" />
+                    <Label Text="Techniques" Style="{StaticResource FieldLabel}" Margin="0" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Passes}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PassToggle">
+                                <HorizontalStackLayout Spacing="2">
+                                    <CheckBox IsChecked="{Binding IsOn}" />
+                                    <Label Text="{Binding Text}" VerticalOptions="Center" FontSize="13" />
+                                </HorizontalStackLayout>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                    <HorizontalStackLayout Spacing="2"><CheckBox IsChecked="{Binding Harden}" /><Label Text="Harden against re-compression (slower, survives websites re-saving the image)" VerticalOptions="Center" FontSize="13" /></HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="2"><CheckBox IsChecked="{Binding Measure}" /><Label Text="Measure how visible and durable it is (slower)" VerticalOptions="Center" FontSize="13" /></HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="2"><CheckBox IsChecked="{Binding UseGpu}" /><Label Text="Use the graphics card when available" VerticalOptions="Center" FontSize="13" /></HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="2"><CheckBox IsChecked="{Binding Metadata}" /><Label Text="Embed the &quot;do not train&quot; declaration, credit and copyright" VerticalOptions="Center" FontSize="13" /></HorizontalStackLayout>
+                    <VerticalStackLayout IsVisible="{Binding Metadata}" Spacing="2" MaximumWidthRequest="520" HorizontalOptions="Start">
+                        <Label Text="Credit (artist name)" Style="{StaticResource FieldLabel}" Margin="0" />
+                        <Entry Text="{Binding Credit}" />
+                        <Label Text="Copyright notice" Style="{StaticResource FieldLabel}" Margin="0" />
+                        <Entry Text="{Binding Copyright}" Placeholder="© 2026 Your name" />
+                    </VerticalStackLayout>
+                    <Label Text="File format" Style="{StaticResource FieldLabel}" Margin="0" />
+                    <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.Formats}" SelectedItem="{Binding Format}" MaximumWidthRequest="260" HorizontalOptions="Start" />
+                    <VerticalStackLayout IsVisible="{Binding IsJpeg}" MaximumWidthRequest="420" HorizontalOptions="Start">
+                        <Label Text="{Binding JpegQuality, StringFormat='JPEG quality: {0:0}'}" Style="{StaticResource FieldLabel}" Margin="0" />
+                        <Slider Minimum="70" Maximum="100" Value="{Binding JpegQuality}" />
+                    </VerticalStackLayout>
+                    <FlexLayout Wrap="Wrap" Margin="0,6,0,0">
+                        <Button Text="Protect with these options" Style="{StaticResource TabButtonSelected}" Margin="0,0,6,6"
+                                Command="{Binding ProtectWithOptionsCommand, Source={x:Reference Self}, x:DataType=views:ProtectControls}"
+                                CommandParameter="{Binding BindingContext, Source={x:Reference Self}, x:DataType=views:ProtectControls}" />
+                        <Button Text="Open in Mistcoat's window" Margin="0,0,6,6"
+                                Command="{Binding OpenInMistcoatCommand, Source={x:Reference Self}, x:DataType=views:ProtectControls}"
+                                CommandParameter="{Binding BindingContext, Source={x:Reference Self}, x:DataType=views:ProtectControls}" />
+                        <Button Text="Close" Margin="0,0,6,6"
+                                Command="{Binding ShowOptionsCommand, Source={x:Reference Self}, x:DataType=views:ProtectControls}"
+                                CommandParameter="{Binding BindingContext, Source={x:Reference Self}, x:DataType=views:ProtectControls}" />
+                    </FlexLayout>
+                </VerticalStackLayout>
+            </Border>
+        </ContentView>
+    </VerticalStackLayout>
+</ContentView>

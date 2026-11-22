@@ -81,7 +81,7 @@ public sealed partial class BundleRow : ObservableObject
 /// The editor for one product. Edits are made on a copy and written on Save; a product changed on another computer
 /// (or by a sync) in the meantime is never overwritten without asking.
 /// </summary>
-public sealed partial class ProductDetailViewModel(AppState app, ThumbnailService thumbs, Core.Integrations.ProductCreator creator, IPlatformServices platform, ProtectionService protection) : ObservableObject, IQueryAttributable
+public sealed partial class ProductDetailViewModel(AppState app, ThumbnailService thumbs, Core.Integrations.ProductCreator creator, IPlatformServices platform, ProtectionService protection, Core.Integrations.ImportService import) : ObservableObject, IQueryAttributable
 {
     public static IReadOnlyList<ProductType> ProductTypes { get; } = Enum.GetValues<ProductType>();
     public static IReadOnlyList<ProductStatus> ProductStatuses { get; } = Enum.GetValues<ProductStatus>();

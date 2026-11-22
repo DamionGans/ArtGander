@@ -5,8 +5,9 @@ using ArtGander.Core.Storage;
 namespace ArtGander.Core.Integrations;
 
 /// <summary>Fetches products and orders from Printify and Shopify and imports what you approve.</summary>
-public sealed class ImportService(Connections connections, ProductCatalog catalog)
+public sealed class ImportService(Connections connections, ProductCatalog catalog, HttpClient? http = null)
 {
+    private PictureDownloader? Download => http is null ? null : ShopPictures.HttpDownloader(http);
     public sealed record ApplyResult(int Saved, IReadOnlyList<string> Skipped);
 
     // ---- Products -------------------------------------------------------------------------------------
@@ -51,6 +52,18 @@ public sealed class ImportService(Connections connections, ProductCatalog catalo
                 var product = ProductImporter.Apply(c, pieces, settings.DefaultCurrency, location);
                 catalog.Save(product);
                 saved++;
+                // Its pictures: Printify's mockups, or the Shopify pictures (now that the product has its folder).
+                if (Download is { } download)
+                {
+                    try
+                    {
+                        if (await ShopPictures.DownloadFromShopAsync(product, c.Printify, c.Shopify, download, ct) > 0) catalog.Save(product);
+                    }
+                    catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException)
+                    {
+                        skipped.Add($"{candidate.Title}: imported, but not all pictures could be downloaded ({ex.Message})");
+                    }
+                }
             }
             catch (Exception ex) when (ex is IOException or ConcurrentEditException or InvalidOperationException)
             {
@@ -90,10 +103,34 @@ public sealed class ImportService(Connections connections, ProductCatalog catalo
     public async Task<List<SyncOutcome>> ApplySyncAsync(string root, LibrarySettings settings, IReadOnlyList<ProductSyncPlan> plans,
         IReadOnlyDictionary<string, SyncResolution> choices, CancellationToken ct)
     {
-        var runner = new SyncRunner(catalog, await connections.PrintifyAsync(), await connections.ShopifyAsync(settings.Integrations));
+        var runner = new SyncRunner(catalog, await connections.PrintifyAsync(), await connections.ShopifyAsync(settings.Integrations), Download);
         var outcomes = await runner.ApplyAsync(root, plans, choices, ct);
         WriteLog(root, plans, choices, outcomes);
         return outcomes;
+    }
+
+    /// <summary>
+    /// Gets a product's pictures from the shops: Printify's current mockups (for products that show them), or the
+    /// Shopify pictures that aren't in ArtGander yet. Saves the product. Returns how many pictures were added.
+    /// </summary>
+    public async Task<int> DownloadPicturesAsync(LibrarySettings settings, Product product, CancellationToken ct)
+    {
+        if (Download is not { } download) throw new InvalidOperationException("Downloading isn't available.");
+        RemoteProduct? p = null, s = null;
+        if (product.Channels.Printify is { ProductId.Length: > 0 } pl && product.EffectivePictures == PictureMode.PrintifyMockups)
+        {
+            var printify = await connections.PrintifyAsync() ?? throw new InvalidOperationException("Printify isn't connected on this computer (Settings → Shops).");
+            p = await printify.GetProductAsync(pl.ShopId, pl.ProductId, ct);
+        }
+        else if (product.Channels.Shopify is { ProductId.Length: > 0 } sl)
+        {
+            var shopify = await connections.ShopifyAsync(settings.Integrations) ?? throw new InvalidOperationException("Shopify isn't connected on this computer (Settings → Shops).");
+            s = await shopify.GetProductAsync(sl.ProductId, ct);
+        }
+        else throw new InvalidOperationException("This product isn't linked to Printify or Shopify yet.");
+        var added = await ShopPictures.DownloadFromShopAsync(product, p, s, download, ct);
+        catalog.Save(product);
+        return added;
     }
 
     private static void WriteLog(string root, IReadOnlyList<ProductSyncPlan> plans, IReadOnlyDictionary<string, SyncResolution> choices, List<SyncOutcome> outcomes)

@@ -24,6 +24,10 @@ ArtGander treats **the file system as the source of truth**. There is no central
     Goose_On_The_Loose-master.tif
     Goose_On_The_Loose-transparent.png
     Goose_On_The_Loose-print-a4.pdf
+    Photograph/                          the original photographs of the artwork (never an art piece)
+      Goose_On_The_Loose-photograph.jpg
+    Protected/                           copies protected against AI training (Mistcoat), named after the original
+      Goose_On_The_Loose-master-protected.png
   Products/                              the products (name set in library.json as productsFolder); never an art piece
     .artgander-products                  hidden marker
     Goose On The Loose/                  group: every product of exactly one art piece or project

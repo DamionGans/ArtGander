@@ -97,13 +97,14 @@ public sealed partial class ProductDetailViewModel
             Product.Pictures = value.Mode;
             OnPropertyChanged();
             OnPropertyChanged(nameof(PictureModeText));
+            OnPropertyChanged(nameof(GetShopPicturesText));
         }
     }
 
     public string PictureModeText => Product.EffectivePictures == PictureMode.Own
         ? IsPrintifyProduct
-            ? "The shop shows these pictures, in this order (the first is the main picture). Printify no longer replaces them when it publishes."
-            : "The shop shows these pictures, in this order (the first is the main picture)."
+            ? "The shop shows these pictures (not the Printify mockups), in this order; the first is the main one. Sync uploads them to Shopify (as the protected copy, when a picture has one), and Printify no longer replaces them when it publishes."
+            : "The shop shows these pictures, in this order; the first is the main one. Sync uploads them to Shopify (as the protected copy, when a picture has one)."
         : "The shop shows the mockups Printify makes. Pictures here are kept for yourself until you switch to your own pictures.";
 
     /// <summary>"None", then every art piece and project.</summary>
@@ -132,6 +133,7 @@ public sealed partial class ProductDetailViewModel
                 var image = Product.Images[i];
                 var row = new ProductImageRow(image, Path.Combine(folder, image.FileName), i, choices);
                 row.CarryOverFrom(previous.FirstOrDefault(p => NameRules.NamesEqual(p.Image.FileName, image.FileName)));
+                row.RefreshProtectedCopy();
                 Images.Add(row);
                 _ = row.LoadThumbnailAsync(thumbs);
             }
@@ -139,11 +141,14 @@ public sealed partial class ProductDetailViewModel
             foreach (var name in state.Untracked)
                 UntrackedImages.Add(new UntrackedImageRow(name, ProductImageService.SuggestLabel(Product, name)));
         }
+        RebuildPhotographs();
         OnPropertyChanged(nameof(HasImages));
         OnPropertyChanged(nameof(HasUntrackedImages));
         OnPropertyChanged(nameof(SelectedPictureMode));
         OnPropertyChanged(nameof(PictureModeText));
         OnPropertyChanged(nameof(IsPrintifyProduct));
+        OnPropertyChanged(nameof(CanGetShopPictures));
+        OnPropertyChanged(nameof(GetShopPicturesText));
     }
 
     private ProductImageRow? ImageRowFor(string fileName) =>
@@ -276,61 +281,100 @@ public sealed partial class ProductDetailViewModel
     private void TrackImageAsIs(UntrackedImageRow? row) => Ui.Fire(() =>
         row is null ? Task.CompletedTask : ImageOpAsync(() => ProductImageService.Track(Product, row.FileName, row.Label, renameToConvention: false)));
 
-    // ---- Protection with Mistcoat ----
+    public bool CanGetShopPictures => !IsNew && (Product.IsOnPrintify || Product.IsOnShopify);
+    public string GetShopPicturesText => Product.IsOnPrintify && Product.EffectivePictures == PictureMode.PrintifyMockups
+        ? "Get Printify's mockups" : "Get pictures from the shop";
 
+    /// <summary>Downloads Printify's current mockups (or the Shopify pictures not here yet) into the product's folder.</summary>
     [RelayCommand]
-    private void QuickProtectImage(ProductImageRow? row) => Ui.Fire(() =>
-        row is null ? Task.CompletedTask : ProtectImageAsync(row, protection.QuickOptions(PieceOf(row)), Path.GetExtension(row.FullPath), ProtectedLabel(row)));
-
-    [RelayCommand]
-    private void ShowImageProtectOptions(ProductImageRow? row)
+    private void GetShopPictures() => Ui.Fire(async () =>
     {
-        if (row is null) return;
-        row.Advanced = row.Advanced is null
-            ? new ProtectOptionsViewModel(Path.GetExtension(row.FullPath), protection.QuickOptions(PieceOf(row)), ProtectedLabel(row))
-            : null;
-    }
-
-    [RelayCommand]
-    private void ProtectImageWithOptions(ProductImageRow? row) => Ui.Fire(() =>
-    {
-        if (row?.Advanced is not { } options) return Task.CompletedTask;
-        var label = string.IsNullOrWhiteSpace(options.Version) ? ProtectedLabel(row) : options.Version;
-        return ProtectImageAsync(row, options.ToOptions(), options.OutputExtension, label);
+        if (HasUnsavedChanges && !await TrySaveAsync()) return;
+        ImagesNotice = "Getting the pictures…";
+        try
+        {
+            int added;
+            using (app.SuspendWatching()) added = await import.DownloadPicturesAsync(app.Settings, Product, CancellationToken.None);
+            ImagesNotice = added == 0 ? "Nothing new: the pictures are up to date." : $"{added} picture(s) added.";
+            Load(app.Catalog.Find(Product.Id) ?? Product);
+        }
+        catch (Exception ex)
+        {
+            ImagesNotice = "";
+            await Dialogs.ErrorAsync(ex);
+        }
     });
 
-    [RelayCommand]
-    private void CancelImageProtect(ProductImageRow? row) => row?.ProtectCancel?.Cancel();
+    // ---- The original photographs (Photograph folder) ----
+
+    public ObservableCollection<SpecialFileRow> Photographs { get; } = [];
+    public bool HasPhotographs => Photographs.Count > 0;
+
+    private void RebuildPhotographs()
+    {
+        var previous = Photographs.ToList();
+        Photographs.Clear();
+        if (ProductCatalog.FolderOf(Product) is { } folder)
+            foreach (var photo in ProtectedCopies.Photographs(folder))
+            {
+                var row = new SpecialFileRow(photo);
+                row.CarryOverFrom(previous.FirstOrDefault(p => string.Equals(p.FullPath, photo, StringComparison.OrdinalIgnoreCase)));
+                row.RefreshProtectedCopy();
+                Photographs.Add(row);
+                _ = row.LoadThumbnailAsync(thumbs);
+            }
+        OnPropertyChanged(nameof(HasPhotographs));
+    }
 
     [RelayCommand]
-    private void OpenImageInMistcoat(ProductImageRow? row) => Ui.Fire(() =>
+    private void OpenPhotograph(SpecialFileRow? row) => Ui.Fire(() => PieceDetailViewModel.OpenFilePathAsync(row?.FullPath));
+
+    [RelayCommand]
+    private void ShowPhotograph(SpecialFileRow? row)
+    {
+        if (row is not null && File.Exists(row.FullPath)) platform.RevealInFileManager(row.FullPath);
+    }
+
+    // ---- Protection with Mistcoat: the copy goes in the product's Protected folder ----
+
+    /// <summary>The row currently shown for the same file (a picture or a photograph); rows are rebuilt after picture operations.</summary>
+    private ProtectableRow? RowNow(ProtectableRow row) =>
+        (ProtectableRow?)Images.FirstOrDefault(r => string.Equals(r.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase))
+        ?? Photographs.FirstOrDefault(r => string.Equals(r.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase));
+
+    private ArtPiece? PieceOf(ProtectableRow row) =>
+        row is ProductImageRow { Image.PieceId: { } id } ? app.Documents.FirstOrDefault(d => d.Piece.Id == id)?.Piece
+        : Product.Pieces.Count == 1 ? app.Documents.FirstOrDefault(d => d.Piece.Id == Product.Pieces[0])?.Piece : null;
+
+    [RelayCommand]
+    private void QuickProtectImage(ProtectableRow? row) => Ui.Fire(() =>
+        row is null ? Task.CompletedTask
+            : PieceDetailViewModel.ProtectRowAsync(protection, row, () => RowNow(row), protection.QuickOptions(PieceOf(row)), Path.GetExtension(row.FullPath)));
+
+    [RelayCommand]
+    private void ShowImageProtectOptions(ProtectableRow? row)
+    {
+        if (row is null) return;
+        row.Advanced = row.Advanced is null ? new ProtectOptionsViewModel(Path.GetExtension(row.FullPath), protection.QuickOptions(PieceOf(row)), "") : null;
+    }
+
+    [RelayCommand]
+    private void ProtectImageWithOptions(ProtectableRow? row) => Ui.Fire(() =>
+        row?.Advanced is not { } options ? Task.CompletedTask
+            : PieceDetailViewModel.ProtectRowAsync(protection, row, () => RowNow(row), options.ToOptions(), options.OutputExtension));
+
+    [RelayCommand]
+    private void CancelImageProtect(ProtectableRow? row) => row?.ProtectCancel?.Cancel();
+
+    [RelayCommand]
+    private void OpenImageInMistcoat(ProtectableRow? row) => Ui.Fire(() =>
         row is null ? Task.CompletedTask : PieceDetailViewModel.OpenInMistcoatAsync(protection, row));
 
-    private ArtPiece? PieceOf(ProductImageRow row) =>
-        row.Image.PieceId is { } id ? app.Documents.FirstOrDefault(d => d.Piece.Id == id)?.Piece : null;
+    [RelayCommand]
+    private void OpenProtectedCopy(ProtectableRow? row) => Ui.Fire(() => PieceDetailViewModel.OpenProtectedCopyAsync(row));
 
-    private static string ProtectedLabel(ProductImageRow row) => ProtectionService.ProtectedVersion(row.Image.Label);
-
-    private Task ProtectImageAsync(ProductImageRow row, MistcoatOptions options, string extension, string label)
-    {
-        var fileName = row.Image.FileName;
-        var source = row.Image;
-        return protection.RunAsync(row, () => ImageRowFor(fileName), options, extension, async (output, result) =>
-        {
-            ProductImage? added = null;
-            await ImageOpAsync(() =>
-            {
-                added = ProductImageService.Import(Product, output, label, source.Kind, source.PieceId, move: true);
-                added.Alt = source.Alt;
-                // Right after the original in the shop order.
-                var at = Product.Images.IndexOf(source);
-                if (at >= 0) Product.Images.Move(Product.Images.IndexOf(added), at + 1);
-            });
-            if (added is null) return "Mistcoat finished, but the protected copy couldn't be added to this product.";
-            if (ImageRowFor(fileName) is { } r) r.Advanced = null;
-            return ProtectionService.SavedMessage(added.FileName, result);
-        });
-    }
+    [RelayCommand]
+    private void ShowProtectedCopy(ProtectableRow? row) => PieceDetailViewModel.ShowProtectedCopy(platform, row);
 }
 
 public sealed record PictureModeChoice(PictureMode Mode, string Title);

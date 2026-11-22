@@ -16,6 +16,8 @@ public sealed record RemoteProduct
     public string Handle { get; init; } = "";
     public string Url { get; init; } = "";
     public string? ImageUrl { get; init; }
+    /// <summary>The product's pictures in shop order (Shopify media; Printify mockups).</summary>
+    public IReadOnlyList<RemoteImage> Images { get; init; } = [];
 
     // Printify only
     public long? ShopId { get; init; }
@@ -27,6 +29,11 @@ public sealed record RemoteProduct
 
     public IEnumerable<RemoteVariant> EnabledVariants => Variants.Where(v => v.Enabled);
 }
+
+/// <summary>A picture of a product in a shop.</summary>
+/// <param name="Id">Shopify: the media id. Printify: the picture's address (Printify has no ids for mockups).</param>
+/// <param name="Selected">Printify: chosen to be published to the store.</param>
+public sealed record RemoteImage(string Id, string Url, string Alt = "", bool Selected = true, bool IsDefault = false);
 
 public sealed record RemoteVariant
 {

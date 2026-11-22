@@ -148,7 +148,11 @@ public sealed partial class PieceDetailViewModel(
         Files.Clear();
         foreach (var f in Doc.Piece.Files)
         {
-            var row = new FileRowViewModel(f, Doc.GetFilePath(f.FileName), folder.MissingFiles.Contains(f.FileName), folder.MisnamedFiles.Contains(f.FileName));
+            var missing = folder.MissingFiles.Contains(f.FileName);
+            var row = new FileRowViewModel(f, Doc.GetFilePath(f.FileName), missing, folder.MisnamedFiles.Contains(f.FileName))
+            {
+                MovedTo = missing ? ProtectedCopies.MovedInto(Doc.FolderPath, f.FileName) : null,
+            };
             CarryOver(previous.FirstOrDefault(p => string.Equals(p.Entry.FileName, f.FileName, StringComparison.OrdinalIgnoreCase)), row);
             Files.Add(row);
             _ = row.LoadThumbnailAsync(thumbs);
@@ -159,8 +163,23 @@ public sealed partial class PieceDetailViewModel(
             var version = FileNamer.SuggestVersion(Doc.FolderName, name);
             Untracked.Add(new UntrackedFileViewModel(name, version, PieceService.GuessKind(version, Path.GetExtension(name), app.Settings.FileKinds)));
         }
+        var previousPhotos = Photographs.ToList();
+        Photographs.Clear();
+        foreach (var photo in ProtectedCopies.Photographs(Doc.FolderPath))
+        {
+            var row = new SpecialFileRow(photo);
+            row.CarryOverFrom(previousPhotos.FirstOrDefault(p => string.Equals(p.FullPath, photo, StringComparison.OrdinalIgnoreCase)));
+            row.RefreshProtectedCopy();
+            Photographs.Add(row);
+            _ = row.LoadThumbnailAsync(thumbs);
+        }
+        OnPropertyChanged(nameof(HasPhotographs));
         _ = LoadThumbnailAsync(folder.PreviewFilePath);
     }
+
+    /// <summary>The original photographs of the artwork, in the piece's Photograph folder.</summary>
+    public ObservableCollection<SpecialFileRow> Photographs { get; } = [];
+    public bool HasPhotographs => Photographs.Count > 0;
 
     private async Task LoadThumbnailAsync(string? path)
     {

@@ -35,6 +35,10 @@ public partial class PieceDetailPage : ContentPage
     public System.Windows.Input.ICommand ProtectWithOptionsCommand => ViewModel.ProtectWithOptionsCommand;
     public System.Windows.Input.ICommand CancelProtectCommand => ViewModel.CancelProtectCommand;
     public System.Windows.Input.ICommand OpenInMistcoatCommand => ViewModel.OpenInMistcoatCommand;
+    public System.Windows.Input.ICommand OpenProtectedCopyCommand => ViewModel.OpenProtectedCopyCommand;
+    public System.Windows.Input.ICommand ShowProtectedCopyCommand => ViewModel.ShowProtectedCopyCommand;
+    public System.Windows.Input.ICommand OpenPhotographCommand => ViewModel.OpenPhotographCommand;
+    public System.Windows.Input.ICommand ShowPhotographCommand => ViewModel.ShowPhotographCommand;
 
     protected override void OnAppearing()
     {
