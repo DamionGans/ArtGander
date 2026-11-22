@@ -8,119 +8,222 @@
              x:DataType="vm:SettingsViewModel"
              Title="Settings">
 
-    <ScrollView>
-        <VerticalStackLayout Padding="24,16" Spacing="4" MaximumWidthRequest="720" HorizontalOptions="Start">
-            <Label Text="Settings" Style="{StaticResource PageTitle}" />
-
-            <Label Text="Art folder" Style="{StaticResource SectionTitle}" />
-            <Label Text="The folder that holds one subfolder per art piece. Use a network drive to share it between your Windows and Mac computers."
-                   Style="{StaticResource Muted}" />
-            <Label Text="{Binding RootPath}" Margin="0,6" LineBreakMode="MiddleTruncation" />
-            <HorizontalStackLayout Spacing="8">
-                <Button Text="Choose art folder…" Command="{Binding ChooseFolderCommand}" />
-                <Button Text="Show in file manager" Command="{Binding RevealFolderCommand}" IsEnabled="{Binding HasRoot}" />
-            </HorizontalStackLayout>
-
-            <VerticalStackLayout IsVisible="{Binding HasRoot}">
-                <Label Text="Library defaults" Style="{StaticResource SectionTitle}" />
-                <Label Text="Stored in the art folder (.artgander/library.json), so every computer uses the same defaults." Style="{StaticResource Muted}" />
-                <Label Text="Currency (e.g. EUR, USD)" Style="{StaticResource FieldLabel}" />
-                <Entry Text="{Binding DefaultCurrency}" WidthRequest="120" HorizontalOptions="Start" MaxLength="3" />
-                <Label Text="Default copyright owner for new pieces" Style="{StaticResource FieldLabel}" />
-                <Entry Text="{Binding DefaultCopyrightOwner}" Placeholder="Your name or studio name" />
-                <Label Text="Sales channels (comma-separated)" Style="{StaticResource FieldLabel}" />
-                <Entry Text="{Binding Channels}" Placeholder="shopify, printify, inPerson, other" />
-                <Label Text="File version kinds (comma-separated)" Style="{StaticResource FieldLabel}" />
-                <Entry Text="{Binding FileKinds}" Placeholder="photo, scan, master, edit, transparent, print, mockup, other" />
-                <Label Text="Every file of an art piece gets one of these kinds. Add your own, e.g. sticker sheet, social media, thumbnail. A new file gets a kind automatically when its version name contains it."
-                       Style="{StaticResource Muted}" />
-                <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" Margin="0,12,0,0" />
-                <Label Text="{Binding Status}" Style="{StaticResource Muted}" IsVisible="{Binding Status, Converter={StaticResource HasValue}}" />
+    <Grid ColumnDefinitions="240,*" Padding="24,16,0,0" ColumnSpacing="24">
+        <!-- Categories, like the system settings: pick one to see its settings -->
+        <VerticalStackLayout Spacing="2">
+            <Label Text="Settings" Style="{StaticResource PageTitle}" Margin="0,0,0,8" />
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Categories}" Spacing="{OnPlatform WinUI=2, MacCatalyst=1}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SettingsCategory">
+                        <Border StrokeThickness="0" StrokeShape="RoundRectangle 5" BackgroundColor="Transparent" Padding="{OnPlatform WinUI='8,6', MacCatalyst='10,5'}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding SelectCategoryCommand, Source={RelativeSource AncestorType={x:Type vm:SettingsViewModel}}, x:DataType=vm:SettingsViewModel}" CommandParameter="{Binding Key}" />
+                            </Border.GestureRecognizers>
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroupList>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#0A000000, Dark=#0FFFFFFF}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateGroupList>
+                            </VisualStateManager.VisualStateGroups>
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding IsCurrent}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{OnPlatform WinUI={AppThemeBinding Light=#0F000000, Dark=#15FFFFFF}, MacCatalyst={StaticResource Pond}}" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{OnPlatform WinUI=10, MacCatalyst=0}">
+                                <BoxView WidthRequest="{OnPlatform WinUI=3, MacCatalyst=0}" HeightRequest="16" CornerRadius="2" Color="{StaticResource Pond}" VerticalOptions="Center" Opacity="0">
+                                    <BoxView.Triggers>
+                                        <DataTrigger TargetType="BoxView" Binding="{Binding IsCurrent}" Value="True">
+                                            <Setter Property="Opacity" Value="{OnPlatform WinUI=1, MacCatalyst=0}" />
+                                        </DataTrigger>
+                                    </BoxView.Triggers>
+                                </BoxView>
+                                <VerticalStackLayout Grid.Column="1">
+                                    <Label Text="{Binding Title}" FontSize="{OnPlatform WinUI=14, MacCatalyst=13}" TextColor="{AppThemeBinding Light=#1A1A1A, Dark=#F0F0F0}">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsCurrent}" Value="True">
+                                                <Setter Property="TextColor" Value="{OnPlatform WinUI={AppThemeBinding Light=#1A1A1A, Dark=#F0F0F0}, MacCatalyst=White}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <Label Text="{Binding Description}" FontSize="11" Opacity="0.7" LineBreakMode="TailTruncation" TextColor="{AppThemeBinding Light=#1A1A1A, Dark=#F0F0F0}">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsCurrent}" Value="True">
+                                                <Setter Property="TextColor" Value="{OnPlatform WinUI={AppThemeBinding Light=#1A1A1A, Dark=#F0F0F0}, MacCatalyst=White}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
             </VerticalStackLayout>
-
-            <!-- Shops: Printify and Shopify -->
-            <VerticalStackLayout IsVisible="{Binding HasRoot}" BindingContext="{Binding Shops}" x:DataType="vm:ShopSettingsViewModel" Spacing="4">
-                <Label Text="Shops" Style="{StaticResource SectionTitle}" />
-                <Label Text="Connect Printify and Shopify to import your products and orders and keep listings up to date from ArtGander. The keys you type here stay in this computer's keychain; enter them once on each computer."
-                       Style="{StaticResource Muted}" />
-                <Button Text="How to get the keys (setup guide)" Command="{Binding OpenGuideCommand}" HorizontalOptions="Start" />
-
-                <Label Text="Printify" FontAttributes="Bold" Margin="0,10,0,0" />
-                <Label Text="Personal access token (Printify → My profile → Connections)" Style="{StaticResource FieldLabel}" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <Entry Text="{Binding PrintifyToken}" IsPassword="True" Placeholder="Paste the token (leave empty to keep the saved one)" />
-                    <Button Grid.Column="1" Text="Connect" Command="{Binding ConnectPrintifyCommand}" />
-                </Grid>
-                <Label Text="Printify shop (the one connected to your Shopify store)" Style="{StaticResource FieldLabel}" IsVisible="{Binding HasShops}" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasShops}">
-                    <Picker ItemsSource="{Binding PrintifyShops}" SelectedItem="{Binding SelectedPrintifyShop}" ItemDisplayBinding="{Binding Title, x:DataType=ci:PrintifyShop}" />
-                    <Button Grid.Column="1" Text="Use this shop" Command="{Binding UsePrintifyShopCommand}" />
-                </Grid>
-                <Label Text="{Binding PrintifyStatus}" Style="{StaticResource Muted}" />
-
-                <Label Text="Shopify" FontAttributes="Bold" Margin="0,10,0,0" />
-                <Label Text="Store address" Style="{StaticResource FieldLabel}" />
-                <Entry Text="{Binding ShopifyDomain}" Placeholder="your-store.myshopify.com" />
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                    <VerticalStackLayout>
-                        <Label Text="Client ID (Dev Dashboard app)" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding ShopifyClientId}" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1">
-                        <Label Text="Client secret" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding ShopifyClientSecret}" IsPassword="True" Placeholder="leave empty to keep the saved one" />
-                    </VerticalStackLayout>
-                </Grid>
-                <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="12">
-                    <VerticalStackLayout>
-                        <Label Text="API version (optional)" Style="{StaticResource FieldLabel}" />
-                        <Entry Text="{Binding ShopifyApiVersion}" Placeholder="{Binding DefaultApiVersion}" />
-                    </VerticalStackLayout>
-                    <Button Grid.Column="2" Text="Save and test" Command="{Binding ConnectShopifyCommand}" VerticalOptions="End" />
-                </Grid>
-                <Label Text="{Binding ShopifyStatus}" Style="{StaticResource Muted}" />
-                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Start" />
-                <Button Text="Forget the keys on this computer" Command="{Binding ForgetKeysCommand}" HorizontalOptions="Start" Margin="0,8,0,0" />
-            </VerticalStackLayout>
-
-            <!-- Image protection: Mistcoat -->
-            <VerticalStackLayout Spacing="4">
-                <Label Text="Image protection" Style="{StaticResource SectionTitle}" />
-                <Label Text="ArtGander uses Mistcoat to make copies of your images that are protected against AI training. Every image of an art piece or product gets a Protect button (quick, with the preset below) and Options… (everything Mistcoat can do). The protected copy goes in the Protected folder next to it, as {name}-protected.{ext}."
-                       Style="{StaticResource Muted}" />
-                <Label Text="Mistcoat program on this computer (empty = look in the usual places)" Style="{StaticResource FieldLabel}" />
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-                    <Entry Text="{Binding MistcoatPath}" Placeholder="e.g. C:\Program Files\Mistcoat\Mistcoat.exe" />
-                    <Button Grid.Column="1" Text="Use this" Command="{Binding SaveMistcoatPathCommand}" />
-                    <Button Grid.Column="2" Text="Choose…" Command="{Binding ChooseMistcoatCommand}" />
-                    <Button Grid.Column="3" Text="Find automatically" Command="{Binding FindMistcoatCommand}" />
-                </Grid>
-                <Label Text="{Binding MistcoatStatus}" Style="{StaticResource Muted}" />
-                <VerticalStackLayout IsVisible="{Binding HasRoot}" Spacing="4">
-                    <Label Text="Shared by all computers; saved with Save settings above." Style="{StaticResource Muted}" Margin="0,6,0,0" />
-                    <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
-                        <VerticalStackLayout>
-                            <Label Text="Preset for quick protect" Style="{StaticResource FieldLabel}" />
-                            <Picker ItemsSource="{x:Static vm:SettingsViewModel.ProtectPresets}" SelectedItem="{Binding ProtectPreset}"
-                                    ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
-                        </VerticalStackLayout>
-                        <VerticalStackLayout Grid.Column="1">
-                            <Label Text="Credit embedded in protected files (empty = the piece's copyright owner)" Style="{StaticResource FieldLabel}" />
-                            <Entry Text="{Binding ProtectCredit}" Placeholder="Your name or studio name" />
-                        </VerticalStackLayout>
-                    </Grid>
-                    <HorizontalStackLayout Spacing="4">
-                        <CheckBox IsChecked="{Binding ProtectMetadata}" />
-                        <Label Text="Embed the &quot;do not train&quot; declaration, credit and copyright" VerticalOptions="Center" />
-                    </HorizontalStackLayout>
-                    <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" />
-                </VerticalStackLayout>
-            </VerticalStackLayout>
-
-            <Label Text="About" Style="{StaticResource SectionTitle}" />
-            <Label Text="{Binding Version}" />
-            <Label Text="{Binding FormatVersion}" Style="{StaticResource Muted}" />
-            <Label Text="Made for an artistic goose on the loose. Honk responsibly." Style="{StaticResource Muted}" Margin="0,8,0,0" />
         </VerticalStackLayout>
-    </ScrollView>
+
+        <ScrollView Grid.Column="1">
+            <VerticalStackLayout Padding="0,0,24,24" Spacing="4" MaximumWidthRequest="760" HorizontalOptions="Start">
+                <Label Text="{Binding CategoryTitle}" Style="{StaticResource SectionTitle}" Margin="0,8,0,4" />
+                <Label Text="Choose an art folder first (under Art folder)." Style="{StaticResource WarningText}" IsVisible="{Binding HasRoot, Converter={StaticResource Not}}" />
+
+                <!-- ============ ART FOLDER ============ -->
+                <VerticalStackLayout IsVisible="{Binding IsFolder}" Spacing="4">
+                    <Label Text="The folder that holds one subfolder per art piece. Use a network drive to share it between your Windows and Mac computers."
+                           Style="{StaticResource Muted}" />
+                    <Label Text="{Binding RootPath}" Margin="0,6" LineBreakMode="MiddleTruncation" />
+                    <HorizontalStackLayout Spacing="8">
+                        <Button Text="Choose art folder…" Command="{Binding ChooseFolderCommand}" />
+                        <Button Text="Show in file manager" Command="{Binding RevealFolderCommand}" IsEnabled="{Binding HasRoot}" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- ============ LIBRARY ============ -->
+                <VerticalStackLayout IsVisible="{Binding IsLibrary}" Spacing="4">
+                    <VerticalStackLayout IsVisible="{Binding HasRoot}" Spacing="4">
+                        <Label Text="Stored in the art folder (.artgander/library.json), so every computer uses the same defaults." Style="{StaticResource Muted}" />
+                        <Label Text="Currency (e.g. EUR, USD)" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding DefaultCurrency}" WidthRequest="120" HorizontalOptions="Start" MaxLength="3" />
+                        <Label Text="Default copyright owner for new pieces" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding DefaultCopyrightOwner}" Placeholder="Your name or studio name" />
+                        <Label Text="Sales channels (comma-separated)" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding Channels}" Placeholder="shopify, printify, inPerson, other" />
+                        <Label Text="File version kinds (comma-separated)" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding FileKinds}" Placeholder="photo, scan, master, edit, transparent, print, mockup, other" />
+                        <Label Text="Every file of an art piece gets one of these kinds. Add your own, e.g. sticker sheet, social media, thumbnail. A new file gets a kind automatically when its version name contains it."
+                               Style="{StaticResource Muted}" />
+                        <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" Margin="0,12,0,0" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- ============ SHOPS ============ -->
+                <VerticalStackLayout IsVisible="{Binding IsShops}">
+                    <VerticalStackLayout IsVisible="{Binding HasRoot}" BindingContext="{Binding Shops}" x:DataType="vm:ShopSettingsViewModel" Spacing="4">
+                        <Label Text="Connect Printify and Shopify to import your products and orders and keep listings up to date from ArtGander. The keys you type here stay in this computer's keychain; enter them once on each computer."
+                               Style="{StaticResource Muted}" />
+                        <Button Text="How to get the keys (setup guide)" Command="{Binding OpenGuideCommand}" HorizontalOptions="Start" />
+
+                        <Label Text="Printify" FontAttributes="Bold" Margin="0,10,0,0" />
+                        <Label Text="Personal access token (Printify → My profile → Connections)" Style="{StaticResource FieldLabel}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Entry Text="{Binding PrintifyToken}" IsPassword="True" Placeholder="Paste the token (leave empty to keep the saved one)" />
+                            <Button Grid.Column="1" Text="Connect" Command="{Binding ConnectPrintifyCommand}" />
+                        </Grid>
+                        <Label Text="Printify shop (the one connected to your Shopify store)" Style="{StaticResource FieldLabel}" IsVisible="{Binding HasShops}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasShops}">
+                            <Picker ItemsSource="{Binding PrintifyShops}" SelectedItem="{Binding SelectedPrintifyShop}" ItemDisplayBinding="{Binding Title, x:DataType=ci:PrintifyShop}" />
+                            <Button Grid.Column="1" Text="Use this shop" Command="{Binding UsePrintifyShopCommand}" />
+                        </Grid>
+                        <Label Text="{Binding PrintifyStatus}" Style="{StaticResource Muted}" />
+
+                        <Label Text="Shopify" FontAttributes="Bold" Margin="0,10,0,0" />
+                        <Label Text="Store address" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding ShopifyDomain}" Placeholder="your-store.myshopify.com" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout>
+                                <Label Text="Client ID (Dev Dashboard app)" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding ShopifyClientId}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Client secret" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding ShopifyClientSecret}" IsPassword="True" Placeholder="leave empty to keep the saved one" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout>
+                                <Label Text="API version (optional)" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding ShopifyApiVersion}" Placeholder="{Binding DefaultApiVersion}" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="2" Text="Save and test" Command="{Binding ConnectShopifyCommand}" VerticalOptions="End" />
+                        </Grid>
+                        <Label Text="{Binding ShopifyStatus}" Style="{StaticResource Muted}" />
+                        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Start" />
+                        <Button Text="Forget the keys on this computer" Command="{Binding ForgetKeysCommand}" HorizontalOptions="Start" Margin="0,8,0,0" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- ============ IMAGE PROTECTION ============ -->
+                <VerticalStackLayout IsVisible="{Binding IsProtection}" Spacing="4">
+                    <Label Text="ArtGander uses Mistcoat to make copies of your images that are protected against AI training. Every image of an art piece or product gets a Protect button (quick, with the preset below) and Options… (everything Mistcoat can do). The protected copy goes in the Protected folder next to it, as {name}-protected.{ext}."
+                           Style="{StaticResource Muted}" />
+                    <Label Text="Mistcoat program on this computer (empty = look in the usual places)" Style="{StaticResource FieldLabel}" />
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                        <Entry Text="{Binding MistcoatPath}" Placeholder="e.g. C:\Program Files\Mistcoat\Mistcoat.exe" />
+                        <Button Grid.Column="1" Text="Use this" Command="{Binding SaveMistcoatPathCommand}" />
+                        <Button Grid.Column="2" Text="Choose…" Command="{Binding ChooseMistcoatCommand}" />
+                        <Button Grid.Column="3" Text="Find automatically" Command="{Binding FindMistcoatCommand}" />
+                    </Grid>
+                    <Label Text="{Binding MistcoatStatus}" Style="{StaticResource Muted}" />
+                    <VerticalStackLayout IsVisible="{Binding HasRoot}" Spacing="4">
+                        <Label Text="Shared by all computers:" Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                        <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
+                            <VerticalStackLayout>
+                                <Label Text="Preset for quick protect" Style="{StaticResource FieldLabel}" />
+                                <Picker ItemsSource="{x:Static vm:SettingsViewModel.ProtectPresets}" SelectedItem="{Binding ProtectPreset}"
+                                        ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Credit embedded in protected files (empty = the piece's copyright owner)" Style="{StaticResource FieldLabel}" />
+                                <Entry Text="{Binding ProtectCredit}" Placeholder="Your name or studio name" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <HorizontalStackLayout Spacing="4">
+                            <CheckBox IsChecked="{Binding ProtectMetadata}" />
+                            <Label Text="Embed the &quot;do not train&quot; declaration, credit and copyright" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" Margin="0,8,0,0" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- ============ COLORS ============ -->
+                <VerticalStackLayout IsVisible="{Binding IsColors}" Spacing="4">
+                    <VerticalStackLayout IsVisible="{Binding HasRoot}" Spacing="4">
+                        <Label Text="The color profiles used for &quot;Add new version&quot; on a cover. A chosen profile is copied into the art folder (.artgander/profiles), so every computer uses exactly the same one. Ask your print shop which CMYK profile they want (e.g. Coated FOGRA39 or PSO Coated v3 in Europe, GRACoL or SWOP in the US)."
+                               Style="{StaticResource Muted}" />
+                        <Label Text="Color conversion isn't available on this computer." Style="{StaticResource WarningText}" IsVisible="{Binding ColorsAvailable, Converter={StaticResource Not}}" />
+
+                        <Label Text="CMYK profile (for print)" Style="{StaticResource FieldLabel}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Picker ItemsSource="{Binding CmykProfiles}" SelectedItem="{Binding CmykProfile}" ItemDisplayBinding="{Binding Title, x:DataType=vm:ProfileChoice}" />
+                            <Button Grid.Column="1" Text="Choose a file…" Command="{Binding ChooseCmykProfileCommand}" />
+                        </Grid>
+                        <Label Text="Adobe RGB profile" Style="{StaticResource FieldLabel}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Picker ItemsSource="{Binding AdobeRgbProfiles}" SelectedItem="{Binding AdobeRgbProfile}" ItemDisplayBinding="{Binding Title, x:DataType=vm:ProfileChoice}" />
+                            <Button Grid.Column="1" Text="Choose a file…" Command="{Binding ChooseAdobeRgbProfileCommand}" />
+                        </Grid>
+                        <Label Text="sRGB profile (screens and the web)" Style="{StaticResource FieldLabel}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Picker ItemsSource="{Binding SrgbProfiles}" SelectedItem="{Binding SrgbProfile}" ItemDisplayBinding="{Binding Title, x:DataType=vm:ProfileChoice}" />
+                            <Button Grid.Column="1" Text="Choose a file…" Command="{Binding ChooseSrgbProfileCommand}" />
+                        </Grid>
+
+                        <Label Text="Colors that don't fit (rendering intent)" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+                        <Picker ItemsSource="{x:Static vm:SettingsViewModel.Intents}" SelectedItem="{Binding Intent}" ItemDisplayBinding="{Binding Title, x:DataType=vm:IntentChoice}" />
+                        <HorizontalStackLayout Spacing="4">
+                            <CheckBox IsChecked="{Binding BlackPointCompensation}" />
+                            <Label Text="Black point compensation (keeps detail in the darkest parts)" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Label Text="A picture without an embedded profile counts as sRGB. CMYK can't be transparent, so transparent parts become white. The new file has its profile embedded."
+                               Style="{StaticResource Muted}" />
+                        <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" Margin="0,8,0,0" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- ============ ABOUT ============ -->
+                <VerticalStackLayout IsVisible="{Binding IsAbout}" Spacing="4">
+                    <Label Text="{Binding Version}" />
+                    <Label Text="{Binding FormatVersion}" Style="{StaticResource Muted}" />
+                    <Label Text="Made for an artistic goose on the loose. Honk responsibly." Style="{StaticResource Muted}" Margin="0,8,0,0" />
+                </VerticalStackLayout>
+
+                <Label Text="{Binding Status}" Style="{StaticResource Muted}" IsVisible="{Binding Status, Converter={StaticResource HasValue}}" Margin="0,8,0,0" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
 </ContentPage>

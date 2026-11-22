@@ -73,6 +73,56 @@
                     <Label Grid.Column="1" Text="{Binding PictureModeText}" Style="{StaticResource Muted}" VerticalOptions="End" />
                 </Grid>
                 <Label Text="{Binding PictureModeText}" Style="{StaticResource Muted}" IsVisible="{Binding IsPrintifyProduct, Converter={StaticResource Not}}" />
+                <!-- The cover (no version): new versions are made from it -->
+                <Label Text="Cover" Style="{StaticResource SectionTitle}" IsVisible="{Binding HasCovers}" Margin="0,0,0,0" />
+                <Label Text="The cover: the picture named after the product without a label ({Product_Name}.{ext}). Make new pictures from it: a copy, or a version in another color space (profiles in Settings → Colors)." Style="{StaticResource Muted}" IsVisible="{Binding HasCovers}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Covers}" Spacing="8" IsVisible="{Binding HasCovers}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CoverRow">
+                            <Border Style="{StaticResource Card}" Padding="10" MaximumWidthRequest="1000" HorizontalOptions="Fill">
+                                <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="8">
+                                    <Border Grid.RowSpan="2" Style="{StaticResource Thumb}" HeightRequest="120" WidthRequest="120" VerticalOptions="Start">
+                                        <Image Source="{Binding Thumbnail}" Aspect="AspectFit" />
+                                    </Border>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <Label Text="{Binding FileName}" FontAttributes="Bold" VerticalOptions="Center" LineBreakMode="MiddleTruncation" />
+                                            <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                                <Button Text="Open" Command="{Binding OpenCoverCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                                <Button Text="Show" Command="{Binding ShowCoverCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                            </HorizontalStackLayout>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="*,260,Auto" ColumnSpacing="10">
+                                            <VerticalStackLayout>
+                                                <Label Text="New version name" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                <Entry Text="{Binding NewVersion}" Placeholder="{Binding VersionPlaceholder}" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1">
+                                                <Label Text="What to make" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                <Picker ItemsSource="{x:Static vm:CoverRow.Targets}" SelectedItem="{Binding Target}" ItemDisplayBinding="{Binding Title, x:DataType=vm:ColorTargetChoice}" />
+                                            </VerticalStackLayout>
+                                            <Button Grid.Column="2" Text="Add new version" VerticalOptions="End" IsEnabled="{Binding CanMake}" Style="{StaticResource TabButtonSelected}"
+                                                    Command="{Binding AddCoverVersionCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" CommandParameter="{Binding .}" />
+                                        </Grid>
+                                        <HorizontalStackLayout Spacing="8" IsVisible="{Binding IsMaking}">
+                                            <ActivityIndicator IsRunning="{Binding IsMaking}" HeightRequest="20" WidthRequest="20" />
+                                            <Label Text="{Binding VersionMessage}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                                        </HorizontalStackLayout>
+                                        <Label Text="{Binding VersionMessage}" Style="{StaticResource Muted}" IsVisible="{Binding HasVersionMessage}" />
+                                    </VerticalStackLayout>
+                                    <views:ProtectControls Grid.Row="1" Grid.Column="1"
+                                        QuickProtectCommand="{Binding QuickProtectImageCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                        ShowOptionsCommand="{Binding ShowImageProtectOptionsCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                        ProtectWithOptionsCommand="{Binding ProtectImageWithOptionsCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                        CancelCommand="{Binding CancelImageProtectCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                        OpenInMistcoatCommand="{Binding OpenImageInMistcoatCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                        OpenCopyCommand="{Binding OpenProtectedCopyCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}"
+                                        ShowCopyCommand="{Binding ShowProtectedCopyCommand, Source={RelativeSource AncestorType={x:Type vm:ProductDetailViewModel}}, x:DataType=vm:ProductDetailViewModel}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
                 <Label Text="{Binding ImagesNotice}" Style="{StaticResource WarningText}" IsVisible="{Binding ImagesNotice, Converter={StaticResource HasValue}}" />
                 <Label Text="No pictures yet. Add photos of the finished product, or mockups." Style="{StaticResource Muted}" IsVisible="{Binding HasImages, Converter={StaticResource Not}}" Margin="0,8" />
 

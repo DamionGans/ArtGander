@@ -11,12 +11,15 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly AppState _app;
     private readonly IPlatformServices _platform;
     private readonly ProtectionService _protection;
+    private readonly Core.Imaging.IColorConverter _colors;
 
-    public SettingsViewModel(AppState app, IPlatformServices platform, ShopSettingsViewModel shops, ProtectionService protection)
+    public SettingsViewModel(AppState app, IPlatformServices platform, ShopSettingsViewModel shops, ProtectionService protection, Core.Imaging.IColorConverter colors)
     {
         _app = app;
         _platform = platform;
         _protection = protection;
+        _colors = colors;
+        Categories[0].IsCurrent = true;
         Shops = shops;
         _app.LibraryChanged += (_, _) => Load();
         Load();
@@ -56,6 +59,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         ProtectMetadata = _app.Settings.Protection.Metadata;
         MistcoatPath = _protection.ConfiguredPath;
         UpdateMistcoatStatus();
+        _profilesLoaded = false;
+        if (Category == "colors") LoadProfiles();
         OnPropertyChanged(nameof(HasRoot));
     }
 
@@ -132,6 +137,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         s.Protection.Metadata = ProtectMetadata;
         try
         {
+            ApplyColors();
             _app.SaveSettings();
             Status = "Saved to the art folder, so these settings are shared with your other computers.";
             await _app.RefreshAsync();

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Color-managed image conversion with ImageMagick (Magick.NET). Used by the Windows app and the tests;
+       macOS uses its own color management (ColorSync) instead. -->
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <RootNamespace>ArtGander.Imaging</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Magick.NET-Q16-AnyCPU" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ArtGander.Core\ArtGander.Core.csproj" />
+  </ItemGroup>
+</Project>

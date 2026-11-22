@@ -136,6 +136,12 @@ public sealed partial class ProductsViewModel : ObservableObject
     /// <summary>The first linked file, or else the first linked piece's preview.</summary>
     private string? PreviewFor(Product p, Dictionary<Guid, Core.Storage.ArtPieceDocument> docs)
     {
+        // The product's own cover, then its main picture, then the art it uses.
+        if (ProductCatalog.FolderOf(p) is { } folder)
+        {
+            if (Core.Services.ProductImageService.Covers(p).FirstOrDefault() is { } cover) return cover;
+            if (p.Images.FirstOrDefault() is { } main && File.Exists(Path.Combine(folder, main.FileName))) return Path.Combine(folder, main.FileName);
+        }
         foreach (var f in p.Files)
         {
             if (docs.TryGetValue(f.PieceId, out var d) && File.Exists(d.GetFilePath(f.FileName))) return d.GetFilePath(f.FileName);

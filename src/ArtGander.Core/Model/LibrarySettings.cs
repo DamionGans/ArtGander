@@ -32,6 +32,20 @@ public sealed partial class LibrarySettings : ModelBase
 
     /// <summary>Defaults for protecting images with Mistcoat (shared by all computers; where Mistcoat is installed is per computer).</summary>
     public ProtectionSettings Protection { get; set; } = new();
+
+    /// <summary>The ICC profiles for CMYK, Adobe RGB and sRGB versions (stored in <c>.artgander/profiles</c>).</summary>
+    public ColorSettings Colors { get; set; } = new();
+}
+
+public sealed partial class ColorSettings : ModelBase
+{
+    /// <summary>File names in <c>.artgander/profiles</c>; empty means the default of the computer's color engine.</summary>
+    [ObservableProperty] public partial string CmykProfile { get; set; } = "";
+    [ObservableProperty] public partial string AdobeRgbProfile { get; set; } = "";
+    [ObservableProperty] public partial string SrgbProfile { get; set; } = "";
+    /// <summary>"perceptual" or "relative" (relative colorimetric).</summary>
+    [ObservableProperty] public partial string Intent { get; set; } = "relative";
+    [ObservableProperty] public partial bool BlackPointCompensation { get; set; } = true;
 }
 
 public sealed partial class ProtectionSettings : ModelBase

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using ArtGander.App.Services;
+using ArtGander.Core.Imaging;
 using ArtGander.Core.Integrations;
 using ArtGander.Core.Model;
 using ArtGander.Core.Naming;
@@ -142,6 +143,7 @@ public sealed partial class ProductDetailViewModel
                 UntrackedImages.Add(new UntrackedImageRow(name, ProductImageService.SuggestLabel(Product, name)));
         }
         RebuildPhotographs();
+        RebuildCovers();
         OnPropertyChanged(nameof(HasImages));
         OnPropertyChanged(nameof(HasUntrackedImages));
         OnPropertyChanged(nameof(SelectedPictureMode));
@@ -305,6 +307,63 @@ public sealed partial class ProductDetailViewModel
         }
     });
 
+    // ---- The cover ({Product_Name}.{ext}): new pictures are made from it ----
+
+    public ObservableCollection<CoverRow> Covers { get; } = [];
+    public bool HasCovers => Covers.Count > 0;
+
+    private void RebuildCovers()
+    {
+        var previous = Covers.ToList();
+        Covers.Clear();
+        foreach (var path in ProductImageService.Covers(Product))
+        {
+            var row = new CoverRow(path);
+            row.CarryOverCover(previous.FirstOrDefault(p => NameRules.NamesEqual(p.FullPath, path)));
+            row.RefreshProtectedCopy();
+            Covers.Add(row);
+            _ = row.LoadThumbnailAsync(thumbs);
+        }
+        OnPropertyChanged(nameof(HasCovers));
+    }
+
+    [RelayCommand]
+    private void AddCoverVersion(CoverRow? row) => Ui.Fire(async () =>
+    {
+        if (row is null || !row.CanMake || IsReadOnly) return;
+        var path = row.FullPath;
+        var target = row.Target.Target;
+        var label = row.LabelToUse;
+        row.IsMaking = true;
+        row.VersionMessage = target == ColorTarget.Copy ? "Copying…" : $"Making the {ColorVersions.Title(target)}…";
+        string message;
+        try
+        {
+            var (temp, _) = await CoverRow.MakeAsync(colors, app.RootPath, app.Settings.Colors, path, target);
+            ProductImage? added = null;
+            await ImageOpAsync(() => added = ProductImageService.Import(Product, temp, label, target == ColorTarget.Cmyk ? ProductImageKind.Other : null, move: true));
+            try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { }
+            message = added is null ? "The new picture couldn't be added." : $"Added {added.FileName} (in the pictures below).";
+            if (added is not null && Covers.FirstOrDefault(c => NameRules.NamesEqual(c.FullPath, path)) is { } now) now.NewVersion = "";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            message = "Not made: " + ex.Message;
+        }
+        var current = Covers.FirstOrDefault(c => NameRules.NamesEqual(c.FullPath, path)) ?? row;
+        current.IsMaking = false;
+        current.VersionMessage = message;
+    });
+
+    [RelayCommand]
+    private void OpenCover(CoverRow? row) => Ui.Fire(() => PieceDetailViewModel.OpenFilePathAsync(row?.FullPath));
+
+    [RelayCommand]
+    private void ShowCover(CoverRow? row)
+    {
+        if (row is not null && File.Exists(row.FullPath)) platform.RevealInFileManager(row.FullPath);
+    }
+
     // ---- The original photographs (Photograph folder) ----
 
     public ObservableCollection<SpecialFileRow> Photographs { get; } = [];
@@ -340,7 +399,8 @@ public sealed partial class ProductDetailViewModel
     /// <summary>The row currently shown for the same file (a picture or a photograph); rows are rebuilt after picture operations.</summary>
     private ProtectableRow? RowNow(ProtectableRow row) =>
         (ProtectableRow?)Images.FirstOrDefault(r => string.Equals(r.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase))
-        ?? Photographs.FirstOrDefault(r => string.Equals(r.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase));
+        ?? (ProtectableRow?)Photographs.FirstOrDefault(r => string.Equals(r.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase))
+        ?? Covers.FirstOrDefault(r => string.Equals(r.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase));
 
     private ArtPiece? PieceOf(ProtectableRow row) =>
         row is ProductImageRow { Image.PieceId: { } id } ? app.Documents.FirstOrDefault(d => d.Piece.Id == id)?.Piece

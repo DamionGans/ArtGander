@@ -191,6 +191,56 @@
         <!-- ============ FILES ============ -->
         <ScrollView Grid.Row="3" IsVisible="{Binding IsFiles}">
             <VerticalStackLayout Spacing="8" Padding="0,0,0,24">
+                <!-- The cover (no version): new versions are made from it -->
+                <Label Text="Cover" Style="{StaticResource SectionTitle}" IsVisible="{Binding HasCovers}" Margin="0,0,0,0" />
+                <Label Text="The cover: the official, fully cropped art, named after the piece without a version ({Art_Piece_Name}.{ext}). Make new versions from it: a copy, or a version in another color space (profiles in Settings → Colors)." Style="{StaticResource Muted}" IsVisible="{Binding HasCovers}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Covers}" Spacing="8" IsVisible="{Binding HasCovers}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CoverRow">
+                            <Border Style="{StaticResource Card}" Padding="10" MaximumWidthRequest="1000" HorizontalOptions="Fill">
+                                <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="8">
+                                    <Border Grid.RowSpan="2" Style="{StaticResource Thumb}" HeightRequest="120" WidthRequest="120" VerticalOptions="Start">
+                                        <Image Source="{Binding Thumbnail}" Aspect="AspectFit" />
+                                    </Border>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <Label Text="{Binding FileName}" FontAttributes="Bold" VerticalOptions="Center" LineBreakMode="MiddleTruncation" />
+                                            <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                                <Button Text="Open" Command="{Binding OpenCoverCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                                <Button Text="Show" Command="{Binding ShowCoverCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                            </HorizontalStackLayout>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="*,260,Auto" ColumnSpacing="10">
+                                            <VerticalStackLayout>
+                                                <Label Text="New version name" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                <Entry Text="{Binding NewVersion}" Placeholder="{Binding VersionPlaceholder}" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1">
+                                                <Label Text="What to make" Style="{StaticResource FieldLabel}" Margin="0" />
+                                                <Picker ItemsSource="{x:Static vm:CoverRow.Targets}" SelectedItem="{Binding Target}" ItemDisplayBinding="{Binding Title, x:DataType=vm:ColorTargetChoice}" />
+                                            </VerticalStackLayout>
+                                            <Button Grid.Column="2" Text="Add new version" VerticalOptions="End" IsEnabled="{Binding CanMake}" Style="{StaticResource TabButtonSelected}"
+                                                    Command="{Binding AddCoverVersionCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" CommandParameter="{Binding .}" />
+                                        </Grid>
+                                        <HorizontalStackLayout Spacing="8" IsVisible="{Binding IsMaking}">
+                                            <ActivityIndicator IsRunning="{Binding IsMaking}" HeightRequest="20" WidthRequest="20" />
+                                            <Label Text="{Binding VersionMessage}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                                        </HorizontalStackLayout>
+                                        <Label Text="{Binding VersionMessage}" Style="{StaticResource Muted}" IsVisible="{Binding HasVersionMessage}" />
+                                    </VerticalStackLayout>
+                                    <views:ProtectControls Grid.Row="1" Grid.Column="1"
+                                        QuickProtectCommand="{Binding QuickProtectCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                        ShowOptionsCommand="{Binding ShowProtectOptionsCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                        ProtectWithOptionsCommand="{Binding ProtectWithOptionsCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                        CancelCommand="{Binding CancelProtectCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                        OpenInMistcoatCommand="{Binding OpenInMistcoatCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                        OpenCopyCommand="{Binding OpenProtectedCopyCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}"
+                                        ShowCopyCommand="{Binding ShowProtectedCopyCommand, Source={x:Reference Root}, x:DataType=views:PieceDetailPage}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
                 <Grid ColumnDefinitions="*,Auto">
                     <Label Text="Files are named {Art_Piece_Name}-{version}.{ext}. Changing a version renames the file on disk. You can also drop files here (Windows)."
                            Style="{StaticResource Muted}" VerticalOptions="Center" />

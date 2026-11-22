@@ -13,5 +13,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\ArtGander.Core\ArtGander.Core.csproj" />
+    <ProjectReference Include="..\..\src\ArtGander.Imaging\ArtGander.Imaging.csproj" />
   </ItemGroup>
 </Project>

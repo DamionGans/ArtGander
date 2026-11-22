@@ -32,6 +32,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPlatformServices, PlatformServices>();
         builder.Services.AddSingleton<ThumbnailService>();
         builder.Services.AddSingleton<ProtectionService>();
+#if WINDOWS
+        builder.Services.AddSingleton<ArtGander.Core.Imaging.IColorConverter, ArtGander.Imaging.MagickColorConverter>();
+#else
+        builder.Services.AddSingleton<ArtGander.Core.Imaging.IColorConverter, MacColorConverter>();
+#endif
         builder.Services.AddSingleton<AppState>();
         builder.Services.AddSingleton<AppShell>();
 

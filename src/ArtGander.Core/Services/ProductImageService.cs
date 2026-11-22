@@ -148,8 +148,25 @@ public static class ProductImageService
         var tracked = new HashSet<string>(product.Images.Select(i => i.FileName), NameRules.Comparer);
         var onDisk = new HashSet<string>(files, NameRules.Comparer);
         return new(
-            files.Where(f => !tracked.Contains(f)).Order(NameRules.NaturalComparer).ToList(),
+            files.Where(f => !tracked.Contains(f) && !IsCover(product, f)).Order(NameRules.NaturalComparer).ToList(),
             product.Images.Select(i => i.FileName).Where(f => !onDisk.Contains(f)).ToList());
+    }
+
+    /// <summary>The product's cover: a picture named after it without a label ({Product_Name}.{ext}), not one of its listed pictures.</summary>
+    public static bool IsCover(Product product, string fileName) =>
+        ProductStore.FolderOf(product) is not null && FileNamer.IsCoverName(ConventionName(product), fileName)
+        && (IsImage(fileName) || Path.GetExtension(fileName).ToLowerInvariant() is ".psd" or ".psb");
+
+    /// <summary>The cover files in the product's folder.</summary>
+    public static IReadOnlyList<string> Covers(Product product)
+    {
+        if (ProductStore.FolderOf(product) is not { } folder || !Directory.Exists(folder)) return [];
+        try
+        {
+            return Directory.EnumerateFiles(folder).Where(f => !Path.GetFileName(f).StartsWith('.') && IsCover(product, Path.GetFileName(f)))
+                .Order(NameRules.NaturalComparer).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return []; }
     }
 
     private static ProductImage? Find(Product product, string fileName) =>

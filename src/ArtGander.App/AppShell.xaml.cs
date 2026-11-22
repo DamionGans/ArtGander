@@ -171,7 +171,26 @@ public partial class AppShell
                     Log($"8b quick protect: {done?.ProtectMessage} copy={done?.ProtectedCopyText} files={vm.Files.Count} photographs={string.Join("|", vm.Photographs.Select(p => p.FileName + ":" + p.ProtectButtonText))}");
                 }
             }
+            if (CurrentPage is PieceDetailPage pcov && pcov.ViewModel.Covers.FirstOrDefault() is { } cover)
+            {
+                var vmc = pcov.ViewModel;
+                cover.Target = ViewModels.CoverRow.Targets.First(t => t.Target == Core.Imaging.ColorTarget.Cmyk);
+                cover.NewVersion = "print";
+                vmc.AddCoverVersionCommand.Execute(cover);
+                for (var i = 0; i < 120 && vmc.Covers.FirstOrDefault() is { IsMaking: true } or { HasVersionMessage: false }; i++) await Task.Delay(500);
+                Log($"8c cover version: {vmc.Covers.FirstOrDefault()?.VersionMessage} files={string.Join("|", vmc.Files.Select(f => f.Entry.FileName + ":" + f.Entry.Kind))} covers={vmc.Covers.Count}");
+            }
             await GoToAsync(".."); await Task.Delay(1000);
+        }
+        if (Handler?.MauiContext?.Services.GetService<Views.SettingsPage>() is not null)
+        {
+            NavigateCommand.Execute("settings"); await Task.Delay(1000);
+            if (CurrentPage is SettingsPage sp && sp.BindingContext is ViewModels.SettingsViewModel svm)
+            {
+                svm.SelectCategoryCommand.Execute("colors"); await Task.Delay(1000);
+                Log($"8d settings colors: title={svm.CategoryTitle} cmyk={svm.CmykProfiles.Count} adobe={svm.AdobeRgbProfiles.Count} srgb={svm.SrgbProfiles.Count} selected={svm.CmykProfile?.Title} shopsVisible={svm.IsShops}");
+                svm.SelectCategoryCommand.Execute("folder"); await Task.Delay(300);
+            }
         }
         if (app.Catalog.All.FirstOrDefault() is { } product)
         {

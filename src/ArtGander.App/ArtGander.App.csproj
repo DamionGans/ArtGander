@@ -61,6 +61,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ArtGander.Core\ArtGander.Core.csproj" />
+    <!-- Windows: color conversion and color-managed previews with ImageMagick. macOS uses ColorSync. -->
+    <ProjectReference Include="..\ArtGander.Imaging\ArtGander.Imaging.csproj" Condition="$(TargetFramework.Contains('-windows'))" />
   </ItemGroup>
 
 </Project>

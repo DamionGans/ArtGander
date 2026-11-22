@@ -21,7 +21,8 @@ public sealed partial class PieceDetailViewModel(
     ProductCatalog catalog,
     IPlatformServices platform,
     ThumbnailService thumbs,
-    ProtectionService protection) : ObservableObject, IQueryAttributable
+    ProtectionService protection,
+    Core.Imaging.IColorConverter colors) : ObservableObject, IQueryAttributable
 {
     public static IReadOnlyList<OriginalStatus> OriginalStatuses { get; } = Enum.GetValues<OriginalStatus>();
     public static IReadOnlyList<CopyrightStatus> CopyrightStatuses { get; } = Enum.GetValues<CopyrightStatus>();
@@ -146,7 +147,9 @@ public sealed partial class PieceDetailViewModel(
         var folder = PieceFolder.From(Doc.FolderPath, Doc);
         var previous = Files.ToList();
         Files.Clear();
-        foreach (var f in Doc.Piece.Files)
+        // Covers (named after the piece, no version) are listed on their own, above the other files.
+        RebuildCovers(Doc.Piece.Files.Where(f => !folder.MissingFiles.Contains(f.FileName)).Select(f => f.FileName).Concat(folder.UntrackedFiles));
+        foreach (var f in Doc.Piece.Files.Where(f => !(IsCoverFile(f.FileName) && !folder.MissingFiles.Contains(f.FileName))))
         {
             var missing = folder.MissingFiles.Contains(f.FileName);
             var row = new FileRowViewModel(f, Doc.GetFilePath(f.FileName), missing, folder.MisnamedFiles.Contains(f.FileName))
@@ -158,7 +161,7 @@ public sealed partial class PieceDetailViewModel(
             _ = row.LoadThumbnailAsync(thumbs);
         }
         Untracked.Clear();
-        foreach (var name in folder.UntrackedFiles)
+        foreach (var name in folder.UntrackedFiles.Where(n => !IsCoverFile(n)))
         {
             var version = FileNamer.SuggestVersion(Doc.FolderName, name);
             Untracked.Add(new UntrackedFileViewModel(name, version, PieceService.GuessKind(version, Path.GetExtension(name), app.Settings.FileKinds)));

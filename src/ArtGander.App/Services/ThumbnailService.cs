@@ -52,5 +52,5 @@ public sealed class ThumbnailService(IPlatformServices platform)
     }
 
     private static string Key(string path, DateTime lastWrite, long length) =>
-        Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes($"{path}|{lastWrite.Ticks}|{length}|{Size}")));
+        Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes($"{path}|{lastWrite.Ticks}|{length}|{Size}|color-managed")));
 }

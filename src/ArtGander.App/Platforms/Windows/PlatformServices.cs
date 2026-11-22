@@ -43,6 +43,16 @@ public sealed class PlatformServices : IPlatformServices
 
     public async Task<bool> CreateThumbnailAsync(string sourcePath, string targetPath, int size)
     {
+        // The Windows thumbnailer ignores color profiles, so CMYK and wide-gamut (e.g. Adobe RGB) pictures would show
+        // wrong colors: those are converted to screen colors through their own profile.
+        var ext = Path.GetExtension(sourcePath).ToLowerInvariant();
+        if (ext is ".tif" or ".tiff" or ".jpg" or ".jpeg" or ".png" or ".webp" or ".psd" or ".psb")
+        {
+            var managed = await Task.Run(() =>
+                ArtGander.Imaging.MagickColorConverter.NeedsColorManagedPreview(sourcePath)
+                && ArtGander.Imaging.MagickColorConverter.TryCreatePreview(sourcePath, targetPath, size));
+            if (managed) return true;
+        }
         try
         {
             var file = await StorageFile.GetFileFromPathAsync(sourcePath);

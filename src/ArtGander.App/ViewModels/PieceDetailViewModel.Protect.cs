@@ -19,7 +19,8 @@ public sealed partial class PieceDetailViewModel
     /// <summary>The row currently shown for the same file as <paramref name="row"/> (a tracked file or a photograph).</summary>
     private ProtectableRow? RowNow(ProtectableRow row) => row is FileRowViewModel f
         ? RowFor(f.Entry.FileName)
-        : Photographs.FirstOrDefault(p => string.Equals(p.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase));
+        : (ProtectableRow?)Photographs.FirstOrDefault(p => string.Equals(p.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase))
+          ?? Covers.FirstOrDefault(p => string.Equals(p.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase));
 
     private static void CarryOver(FileRowViewModel? from, FileRowViewModel to)
     {
