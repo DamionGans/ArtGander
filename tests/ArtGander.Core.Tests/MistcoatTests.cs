@@ -41,6 +41,23 @@ public class MistcoatTests
     }
 
     [Fact]
+    public void A_watermark_is_passed_with_its_settings()
+    {
+        var args = MistcoatRunner.BuildArguments("a.png", "b.png", new MistcoatOptions
+        {
+            Watermark = " © Hope Gans ", WatermarkLayout = "centre", WatermarkResistance = "maximum", WatermarkOpacity = 140,
+        }).ToList();
+        Assert.Equal("© Hope Gans", args[args.IndexOf("--watermark") + 1]);
+        Assert.Equal("centre", args[args.IndexOf("--watermark-layout") + 1]);
+        Assert.Equal("maximum", args[args.IndexOf("--watermark-resistance") + 1]);
+        Assert.Equal("100", args[args.IndexOf("--watermark-opacity") + 1]);
+
+        // No watermark: none of its options; an unknown layout is left out.
+        Assert.DoesNotContain(MistcoatRunner.BuildArguments("a.png", "b.png", new MistcoatOptions { WatermarkLayout = "tiled" }), a => a.StartsWith("--watermark"));
+        Assert.DoesNotContain("--watermark-layout", MistcoatRunner.BuildArguments("a.png", "b.png", new MistcoatOptions { Watermark = "X", WatermarkLayout = "diagonal" }));
+    }
+
+    [Fact]
     public void Reads_progress_lines_and_ignores_others()
     {
         var p = MistcoatRunner.ParseProgress("""{"event": "progress", "index": 1, "total": 1, "file": "a.png", "stage": "Hardening against re-compression", "fraction": 0.7}""");
@@ -72,6 +89,11 @@ public class MistcoatTests
         var bad = MistcoatRunner.ParseResult("""{"mistcoat": "0.1.0", "ok": false, "error": "bad arguments: unknown preset"}""");
         Assert.Equal("bad arguments: unknown preset", bad!.Error);
         Assert.Null(MistcoatRunner.ParseResult("not json at all"));
+
+        var cmyk = MistcoatRunner.ParseResult("""{"ok": true, "results": [{"status": "ok", "output": "b.png", "color": {"input": "8-bit CMYK, Coated FOGRA39", "output": "8-bit RGB, Adobe RGB (1998)"}}]}""")!;
+        Assert.Equal("colors: 8-bit CMYK, Coated FOGRA39 → 8-bit RGB, Adobe RGB (1998)", cmyk.Summary);
+        var same = MistcoatRunner.ParseResult("""{"ok": true, "results": [{"status": "ok", "output": "b.tif", "color": {"input": "16-bit RGB", "output": "16-bit RGB"}}]}""")!;
+        Assert.Null(same.ColorNote);
     }
 
     [Fact]
@@ -124,7 +146,7 @@ public class MistcoatTests
             var dst = Path.Combine(dir.FullName, "out.png");
             var stages = new List<string>();
             var result = await new MistcoatRunner(exe).ProtectAsync(src, dst,
-                new MistcoatOptions { Preset = "light", Quick = true, Harden = false }, new SyncProgress(p => stages.Add(p.Stage)),
+                new MistcoatOptions { Preset = "light", Quick = true, Harden = false, Watermark = "SAMPLE", WatermarkLayout = "centre" }, new SyncProgress(p => stages.Add(p.Stage)),
                 TestContext.Current.CancellationToken);
             Assert.True(result.Ok, result.Error);
             Assert.True(File.Exists(dst));

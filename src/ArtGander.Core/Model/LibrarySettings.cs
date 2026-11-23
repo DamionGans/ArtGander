@@ -56,6 +56,17 @@ public sealed partial class ProtectionSettings : ModelBase
     [ObservableProperty] public partial string Credit { get; set; } = "";
     /// <summary>Embed the machine-readable "do not train" declaration.</summary>
     [ObservableProperty] public partial bool Metadata { get; set; } = true;
+
+    /// <summary>Draw a visible watermark into protected copies (Mistcoat; off by default).</summary>
+    [ObservableProperty] public partial bool Watermark { get; set; }
+    /// <summary>The watermark text; empty uses "SAMPLE".</summary>
+    [ObservableProperty] public partial string WatermarkText { get; set; } = "";
+    /// <summary>tiled, centre or corner.</summary>
+    [ObservableProperty] public partial string WatermarkLayout { get; set; } = "tiled";
+    /// <summary>How hard it is to remove: plain, strong or maximum.</summary>
+    [ObservableProperty] public partial string WatermarkResistance { get; set; } = "strong";
+    /// <summary>5–100 percent.</summary>
+    [ObservableProperty] public partial double WatermarkOpacity { get; set; } = 50;
 }
 
 public sealed partial class IntegrationSettings : ModelBase

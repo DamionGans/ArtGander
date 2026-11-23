@@ -176,6 +176,34 @@
                             <CheckBox IsChecked="{Binding ProtectMetadata}" />
                             <Label Text="Embed the &quot;do not train&quot; declaration, credit and copyright" VerticalOptions="Center" />
                         </HorizontalStackLayout>
+
+                        <Label Text="Visible watermark" FontAttributes="Bold" Margin="0,10,0,0" />
+                        <Label Text="Text drawn into the picture before it's protected, so the mark is protected too. Off by default; Options… can switch it per picture."
+                               Style="{StaticResource Muted}" />
+                        <HorizontalStackLayout Spacing="4">
+                            <CheckBox IsChecked="{Binding ProtectWatermark}" />
+                            <Label Text="Add a watermark with quick protect" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Label Text="Watermark text" Style="{StaticResource FieldLabel}" />
+                        <Entry Text="{Binding ProtectWatermarkText}" Placeholder="SAMPLE (e.g. your name or © 2026 your studio)" />
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                            <VerticalStackLayout>
+                                <Label Text="Placement" Style="{StaticResource FieldLabel}" />
+                                <Picker ItemsSource="{x:Static vm:SettingsViewModel.WatermarkLayouts}" SelectedItem="{Binding ProtectWatermarkLayout}"
+                                        ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Hard to remove" Style="{StaticResource FieldLabel}" />
+                                <Picker ItemsSource="{x:Static vm:SettingsViewModel.WatermarkResistances}" SelectedItem="{Binding ProtectWatermarkResistance}"
+                                        ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2">
+                                <Label Text="{Binding ProtectWatermarkOpacityText}" Style="{StaticResource FieldLabel}" />
+                                <Slider Minimum="5" Maximum="100" Value="{Binding ProtectWatermarkOpacity}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Label Text="Placement: tiled repeats it across the picture, centre puts it once in the middle, corner small at the bottom right. Hard to remove: plain is an even pattern; strong (recommended) varies every mark; maximum also weaves it into the texture."
+                               Style="{StaticResource Muted}" />
                         <Button Text="Save settings" Command="{Binding SaveCommand}" HorizontalOptions="Start" Margin="0,8,0,0" />
                     </VerticalStackLayout>
                 </VerticalStackLayout>

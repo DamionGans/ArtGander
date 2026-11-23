@@ -63,6 +63,27 @@
                         <Label Text="Copyright notice" Style="{StaticResource FieldLabel}" Margin="0" />
                         <Entry Text="{Binding Copyright}" Placeholder="© 2026 Your name" />
                     </VerticalStackLayout>
+                    <!-- Visible watermark (drawn in before the protection, so it's protected too) -->
+                    <HorizontalStackLayout Spacing="2" Margin="0,6,0,0"><CheckBox IsChecked="{Binding Watermark}" /><Label Text="Add a visible watermark (text drawn into the picture, hard for AI tools to remove)" VerticalOptions="Center" FontSize="13" /></HorizontalStackLayout>
+                    <VerticalStackLayout IsVisible="{Binding Watermark}" Spacing="2" MaximumWidthRequest="520" HorizontalOptions="Start">
+                        <Label Text="Watermark text" Style="{StaticResource FieldLabel}" Margin="0" />
+                        <Entry Text="{Binding WatermarkText}" Placeholder="SAMPLE" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <VerticalStackLayout>
+                                <Label Text="Placement" Style="{StaticResource FieldLabel}" Margin="0" />
+                                <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.WatermarkLayouts}" SelectedItem="{Binding WatermarkLayout}"
+                                        ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Hard to remove" Style="{StaticResource FieldLabel}" Margin="0" />
+                                <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.WatermarkResistances}" SelectedItem="{Binding WatermarkResistance}"
+                                        ItemDisplayBinding="{Binding ., Converter={StaticResource Humanize}, x:DataType=x:Object}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Label Text="{Binding WatermarkResistanceBlurb}" Style="{StaticResource Muted}" FontSize="12" />
+                        <Label Text="{Binding WatermarkOpacityText}" Style="{StaticResource FieldLabel}" Margin="0" />
+                        <Slider Minimum="5" Maximum="100" Value="{Binding WatermarkOpacity}" />
+                    </VerticalStackLayout>
                     <Label Text="File format" Style="{StaticResource FieldLabel}" Margin="0" />
                     <Picker ItemsSource="{x:Static vm:ProtectOptionsViewModel.Formats}" SelectedItem="{Binding Format}" MaximumWidthRequest="260" HorizontalOptions="Start" />
                     <VerticalStackLayout IsVisible="{Binding IsJpeg}" MaximumWidthRequest="420" HorizontalOptions="Start">

@@ -160,15 +160,18 @@ public partial class AppShell
                 vm.Tab = "files"; await Task.Delay(500);
                 vm.ShowProtectOptionsCommand.Execute(row); await Task.Delay(800);
                 Log($"8a options open={row.Advanced is not null} preset={row.Advanced?.Preset} passes={row.Advanced?.Passes.Count(p => p.IsOn)}");
-                vm.ShowProtectOptionsCommand.Execute(row); await Task.Delay(300);
-                if (Environment.GetEnvironmentVariable("MISTCOAT_EXE") is { Length: > 0 })
+                if (Environment.GetEnvironmentVariable("MISTCOAT_EXE") is { Length: > 0 } && row.Advanced is { } options)
                 {
                     var name = row.Entry.FileName;
-                    vm.QuickProtectCommand.Execute(row);
+                    options.Watermark = true;
+                    options.WatermarkText = "ArtGander test";
+                    options.WatermarkLayout = "centre";
+                    options.Measure = false;
+                    vm.ProtectWithOptionsCommand.Execute(row);
                     for (var i = 0; i < 240 && !(vm.Files.FirstOrDefault(f => f.Entry.FileName == name) is { IsProtecting: false, ProtectMessage.Length: > 0 }); i++)
                         await Task.Delay(500);
                     var done = vm.Files.FirstOrDefault(f => f.Entry.FileName == name);
-                    Log($"8b quick protect: {done?.ProtectMessage} copy={done?.ProtectedCopyText} files={vm.Files.Count} photographs={string.Join("|", vm.Photographs.Select(p => p.FileName + ":" + p.ProtectButtonText))}");
+                    Log($"8b protect with watermark: {done?.ProtectMessage} copy={done?.ProtectedCopyText} files={vm.Files.Count} photographs={string.Join("|", vm.Photographs.Select(p => p.FileName + ":" + p.ProtectButtonText))}");
                 }
             }
             if (CurrentPage is PieceDetailPage pcov && pcov.ViewModel.Covers.FirstOrDefault() is { } cover)

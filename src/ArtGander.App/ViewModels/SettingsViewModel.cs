@@ -39,6 +39,15 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string ProtectPreset { get; set; } = "balanced";
     [ObservableProperty] public partial string ProtectCredit { get; set; } = "";
     [ObservableProperty] public partial bool ProtectMetadata { get; set; } = true;
+    public static IReadOnlyList<string> WatermarkLayouts => ArtGander.Core.Integrations.MistcoatPasses.WatermarkLayouts;
+    public static IReadOnlyList<string> WatermarkResistances => ArtGander.Core.Integrations.MistcoatPasses.WatermarkResistances;
+    [ObservableProperty] public partial bool ProtectWatermark { get; set; }
+    [ObservableProperty] public partial string ProtectWatermarkText { get; set; } = "";
+    [ObservableProperty] public partial string ProtectWatermarkLayout { get; set; } = "tiled";
+    [ObservableProperty] public partial string ProtectWatermarkResistance { get; set; } = "strong";
+    [ObservableProperty] public partial double ProtectWatermarkOpacity { get; set; } = 50;
+    public string ProtectWatermarkOpacityText => $"Opacity: {ProtectWatermarkOpacity:0}%";
+    partial void OnProtectWatermarkOpacityChanged(double value) => OnPropertyChanged(nameof(ProtectWatermarkOpacityText));
 
     public bool HasRoot => _app.HasRoot;
 
@@ -57,6 +66,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         ProtectPreset = _app.Settings.Protection.Preset;
         ProtectCredit = _app.Settings.Protection.Credit;
         ProtectMetadata = _app.Settings.Protection.Metadata;
+        ProtectWatermark = _app.Settings.Protection.Watermark;
+        ProtectWatermarkText = _app.Settings.Protection.WatermarkText;
+        ProtectWatermarkLayout = WatermarkLayouts.Contains(_app.Settings.Protection.WatermarkLayout) ? _app.Settings.Protection.WatermarkLayout : "tiled";
+        ProtectWatermarkResistance = WatermarkResistances.Contains(_app.Settings.Protection.WatermarkResistance) ? _app.Settings.Protection.WatermarkResistance : "strong";
+        ProtectWatermarkOpacity = _app.Settings.Protection.WatermarkOpacity;
         MistcoatPath = _protection.ConfiguredPath;
         UpdateMistcoatStatus();
         _profilesLoaded = false;
@@ -135,6 +149,11 @@ public sealed partial class SettingsViewModel : ObservableObject
         s.Protection.Preset = ProtectPresets.Contains(ProtectPreset) ? ProtectPreset : "balanced";
         s.Protection.Credit = ProtectCredit.Trim();
         s.Protection.Metadata = ProtectMetadata;
+        s.Protection.Watermark = ProtectWatermark;
+        s.Protection.WatermarkText = ProtectWatermarkText.Trim();
+        s.Protection.WatermarkLayout = ProtectWatermarkLayout;
+        s.Protection.WatermarkResistance = ProtectWatermarkResistance;
+        s.Protection.WatermarkOpacity = Math.Clamp(Math.Round(ProtectWatermarkOpacity), 5, 100);
         try
         {
             ApplyColors();

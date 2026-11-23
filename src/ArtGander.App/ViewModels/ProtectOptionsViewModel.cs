@@ -10,6 +10,8 @@ public sealed partial class ProtectOptionsViewModel : ObservableObject
     public const string SameFormat = "Same as the file";
     public static IReadOnlyList<string> Presets => MistcoatPasses.Presets;
     public static IReadOnlyList<string> Formats { get; } = [SameFormat, "PNG", "JPEG", "WebP", "TIFF"];
+    public static IReadOnlyList<string> WatermarkLayouts => MistcoatPasses.WatermarkLayouts;
+    public static IReadOnlyList<string> WatermarkResistances => MistcoatPasses.WatermarkResistances;
 
     private readonly string _sourceExtension;
 
@@ -22,6 +24,11 @@ public sealed partial class ProtectOptionsViewModel : ObservableObject
         Credit = defaults.Credit;
         Copyright = defaults.Copyright;
         Version = version;
+        Watermark = !string.IsNullOrWhiteSpace(defaults.Watermark);
+        WatermarkText = defaults.Watermark ?? "";
+        WatermarkLayout = defaults.WatermarkLayout is { } l && WatermarkLayouts.Contains(l) ? l : "tiled";
+        WatermarkResistance = defaults.WatermarkResistance is { } r && WatermarkResistances.Contains(r) ? r : "strong";
+        WatermarkOpacity = defaults.WatermarkOpacity ?? 50;
         Preset = defaults.Preset; // applies strength and passes
         OnPresetChanged(Preset);
     }
@@ -39,6 +46,22 @@ public sealed partial class ProtectOptionsViewModel : ObservableObject
     [ObservableProperty] public partial double JpegQuality { get; set; } = 95;
     [ObservableProperty] public partial bool Measure { get; set; } = true;
     [ObservableProperty] public partial bool UseGpu { get; set; } = true;
+    /// <summary>A visible watermark drawn into the picture before it's protected.</summary>
+    [ObservableProperty] public partial bool Watermark { get; set; }
+    [ObservableProperty] public partial string WatermarkText { get; set; } = "";
+    [ObservableProperty] public partial string WatermarkLayout { get; set; } = "tiled";
+    [ObservableProperty] public partial string WatermarkResistance { get; set; } = "strong";
+    [ObservableProperty] public partial double WatermarkOpacity { get; set; } = 50;
+    public string WatermarkOpacityText => $"Watermark opacity: {WatermarkOpacity:0}%";
+    partial void OnWatermarkOpacityChanged(double value) => OnPropertyChanged(nameof(WatermarkOpacityText));
+    public string WatermarkResistanceBlurb => WatermarkResistance switch
+    {
+        "plain" => "An even pattern: easiest to read, easiest to remove.",
+        "maximum" => "Extra rows woven into the texture: hardest to remove, most visible.",
+        _ => "Every mark differs a little in place, angle, size and opacity, with a soft edge: hard for AI tools to remove.",
+    };
+    partial void OnWatermarkResistanceChanged(string value) => OnPropertyChanged(nameof(WatermarkResistanceBlurb));
+
     /// <summary>The version label the protected copy is saved under.</summary>
     [ObservableProperty] public partial string Version { get; set; } = "";
 
@@ -78,6 +101,10 @@ public sealed partial class ProtectOptionsViewModel : ObservableObject
         JpegQuality = IsJpeg ? (int)Math.Round(JpegQuality) : null,
         Quick = !Measure,
         UseGpu = UseGpu ? null : false,
+        Watermark = Watermark ? ArtGander.App.Services.ProtectionService.WatermarkTextOrDefault(WatermarkText) : null,
+        WatermarkLayout = WatermarkLayout,
+        WatermarkResistance = WatermarkResistance,
+        WatermarkOpacity = Math.Round(WatermarkOpacity),
     };
 }
 

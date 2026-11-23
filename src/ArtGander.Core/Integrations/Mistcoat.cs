@@ -28,6 +28,15 @@ public sealed record MistcoatOptions
     /// <summary>Skip the quality measurement (faster; no visibility/durability figures).</summary>
     public bool Quick { get; init; }
     public bool? UseGpu { get; init; }
+
+    /// <summary>A visible watermark drawn into the picture before it's protected (so it's protected too), or null for none.</summary>
+    public string? Watermark { get; init; }
+    /// <summary>tiled (repeated across the picture), centre, or corner.</summary>
+    public string? WatermarkLayout { get; init; }
+    /// <summary>How hard it is to remove: plain, strong or maximum.</summary>
+    public string? WatermarkResistance { get; init; }
+    /// <summary>5–100 percent.</summary>
+    public double? WatermarkOpacity { get; init; }
 }
 
 /// <summary>Mistcoat's passes and presets, with the names its command line uses.</summary>
@@ -35,6 +44,9 @@ public static class MistcoatPasses
 {
     public const string DefaultPreset = "balanced";
     public static IReadOnlyList<string> Presets { get; } = ["light", "balanced", "strong", "maximum"];
+    public static IReadOnlyList<string> WatermarkLayouts { get; } = ["tiled", "centre", "corner"];
+    public static IReadOnlyList<string> WatermarkResistances { get; } = ["plain", "strong", "maximum"];
+    public const string DefaultWatermark = "SAMPLE";
 
     public static IReadOnlyList<(string Name, string Label, string Visibility)> All { get; } =
     [
@@ -74,8 +86,15 @@ public sealed record MistcoatResult(
     double? Seconds,
     IReadOnlyList<string> Passes)
 {
+    /// <summary>What the original was and what was written, e.g. "16-bit RGB, Adobe RGB (1998)" (newer Mistcoat).</summary>
+    public string? ColorIn { get; init; }
+    public string? ColorOut { get; init; }
+
+    /// <summary>Said only when the protected copy's colors differ from the original's (e.g. CMYK saved as PNG).</summary>
+    public string? ColorNote => ColorIn is { Length: > 0 } i && ColorOut is { Length: > 0 } o && i != o ? $"colors: {i} → {o}" : null;
+
     public string Summary => Ok
-        ? string.Join(" · ", new[] { Visibility, Durability, Seconds is { } s ? $"{s:0} s" : null }.Where(x => !string.IsNullOrEmpty(x)))
+        ? string.Join(" · ", new[] { Visibility, Durability, ColorNote, Seconds is { } s ? $"{s:0} s" : null }.Where(x => !string.IsNullOrEmpty(x)))
         : Error ?? "Mistcoat failed.";
 }
 
@@ -192,6 +211,13 @@ public sealed class MistcoatRunner(string executable)
         if (!string.IsNullOrWhiteSpace(o.Credit)) args.AddRange(["--credit", o.Credit.Trim()]);
         if (!string.IsNullOrWhiteSpace(o.Copyright)) args.AddRange(["--copyright", o.Copyright.Trim()]);
         if (o.JpegQuality is { } q) args.AddRange(["--jpeg-quality", Math.Clamp(q, 70, 100).ToString(CultureInfo.InvariantCulture)]);
+        if (!string.IsNullOrWhiteSpace(o.Watermark))
+        {
+            args.AddRange(["--watermark", o.Watermark.Trim()]);
+            if (o.WatermarkLayout is { } layout && MistcoatPasses.WatermarkLayouts.Contains(layout)) args.AddRange(["--watermark-layout", layout]);
+            if (o.WatermarkResistance is { } resistance && MistcoatPasses.WatermarkResistances.Contains(resistance)) args.AddRange(["--watermark-resistance", resistance]);
+            if (o.WatermarkOpacity is { } opacity) args.AddRange(["--watermark-opacity", Math.Clamp(opacity, 5, 100).ToString("0.#", CultureInfo.InvariantCulture)]);
+        }
         if (o.Quick) args.Add("--quick");
         args.AddRange(["--json", "--progress", "json"]);
         return args;
@@ -239,10 +265,13 @@ public sealed class MistcoatRunner(string executable)
 
         string text;
         lock (stdout) text = stdout.ToString();
-        var result = ParseResult(text);
-        if (result is not null) return result;
         string err;
         lock (otherErrors) err = otherErrors.ToString().Trim();
+        var result = ParseResult(text);
+        if (result is { Ok: false } && !string.IsNullOrEmpty(options.Watermark)
+            && $"{result.Error} {err}".Contains("--watermark", StringComparison.Ordinal) && $"{result.Error} {err}".Contains("unrecognized", StringComparison.OrdinalIgnoreCase))
+            return Failed("This Mistcoat is too old for watermarks. Please update Mistcoat (or protect without a watermark).");
+        if (result is not null) return result;
         return Failed(err.Length > 0 ? err : $"Mistcoat stopped with exit code {process.ExitCode} and no result.");
     }
 
@@ -290,8 +319,14 @@ public sealed class MistcoatRunner(string executable)
                         ? ps.EnumerateArray().Select(p => p.GetString() ?? "").Where(p => p.Length > 0).ToList()
                         : [];
                     double? seconds = r.TryGetProperty("seconds", out var sec) && sec.ValueKind == JsonValueKind.Number ? sec.GetDouble() : null;
+                    string? colorIn = null, colorOut = null;
+                    if (r.TryGetProperty("color", out var col) && col.ValueKind == JsonValueKind.Object)
+                    {
+                        colorIn = Str(col, "input");
+                        colorOut = Str(col, "output");
+                    }
                     return new MistcoatResult(ok, Str(r, "output"), ok ? null : Str(r, "error") ?? "Mistcoat couldn't protect this image.",
-                        visibility, durability, seconds, passes);
+                        visibility, durability, seconds, passes) { ColorIn = colorIn, ColorOut = colorOut };
                 }
                 if (Str(root, "error") is { } error) return Failed(error);
             }

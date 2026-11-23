@@ -43,7 +43,13 @@ public sealed class ProtectionService(AppState app)
         Metadata = Defaults.Metadata,
         Credit = Defaults.Metadata ? CreditFor(piece) : "",
         Copyright = Defaults.Metadata ? CopyrightFor(piece) : "",
+        Watermark = Defaults.Watermark ? WatermarkTextOrDefault(Defaults.WatermarkText) : null,
+        WatermarkLayout = Defaults.WatermarkLayout,
+        WatermarkResistance = Defaults.WatermarkResistance,
+        WatermarkOpacity = Defaults.WatermarkOpacity,
     };
+
+    public static string WatermarkTextOrDefault(string? text) => string.IsNullOrWhiteSpace(text) ? MistcoatPasses.DefaultWatermark : text.Trim();
 
     /// <summary>The version label for the protected copy of a file: "protected", or "{version}-protected".</summary>
     public static string ProtectedVersion(string sourceVersion) =>
